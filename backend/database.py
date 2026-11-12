@@ -23,7 +23,10 @@ except Exception as e:
     IS_POSTGRES = False
     print(f"[Database] PostgreSQL connection unviable ({e}). Using embedded SQLite database (backend/gapfinder.db).")
 
-SQLITE_PATH = os.path.join(os.path.dirname(__file__), "gapfinder.db")
+if os.environ.get("VERCEL"):
+    SQLITE_PATH = "/tmp/gapfinder.db"
+else:
+    SQLITE_PATH = os.path.join(os.path.dirname(__file__), "gapfinder.db")
 
 def get_connection():
     if IS_POSTGRES:
