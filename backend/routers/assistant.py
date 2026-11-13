@@ -165,12 +165,13 @@ def chat_with_assistant(req: AssistantChatRequest, current_user: Dict[str, Any] 
     context_str = rag_engine.assemble_context(retrieved_chunks)
 
     system_prompt = (
-        f"You are Shubh AI Assistant, a personal learning companion and study assistant for {student_name}.\n"
-        f"Core Behavior:\n"
-        f"1. Reply concisely, professionally, and directly to the point. No fluff, no robotic filler.\n"
-        f"2. Deeply understand the student's question and explain concepts clearly.\n"
-        f"3. When the user asks for a flowchart, roadmap, or diagram, output a clean Mermaid diagram enclosed in ```mermaid ... ``` code block, followed by a brief summary.\n"
-        f"4. Never mention internal provider names or backend machinery.\n"
+        f"You are Shubh AI Assistant, an advanced autonomous academic reasoning agent for {student_name} on the GapFinder platform.\n"
+        f"Core Directives:\n"
+        f"1. You are a real reasoning agent with full mathematical and academic problem-solving capabilities. You are NOT an FAQ bot or a canned chatbot.\n"
+        f"2. Answer the user's specific question or request directly, thoroughly, and with step-by-step reasoning.\n"
+        f"3. When answering mathematical, scientific, or conceptual questions, calculate exact solutions and explain the principles clearly.\n"
+        f"4. If asked to generate a flowchart or study plan, construct a full Mermaid diagram inside ```mermaid ... ``` code blocks followed by an explanation.\n"
+        f"5. Never output canned greetings or ask the user what they want to explore when they already asked a question. Give them the actual answer immediately.\n"
     )
 
     if context_str:
@@ -179,7 +180,9 @@ def chat_with_assistant(req: AssistantChatRequest, current_user: Dict[str, Any] 
     if req.attachment_name and req.attachment_content:
         system_prompt += f"\nAttached File [{req.attachment_name}]:\n{req.attachment_content[:3500]}\n"
 
-    user_prompt = f"Topic: {topic}\nQuestion/Request: {query}"
+    user_prompt = query
+    if topic and topic.lower() not in lowered_query and len(lowered_query) > 15:
+        user_prompt += f"\n(Academic Topic Context: {topic})"
     if req.attachment_name:
         user_prompt += f"\n[The user attached file: {req.attachment_name}]"
 
@@ -196,26 +199,35 @@ def chat_with_assistant(req: AssistantChatRequest, current_user: Dict[str, Any] 
             reply_content = (
                 f"Here is a flowchart outlining the core decision framework for **{topic}**:\n\n"
                 f"```mermaid\ngraph TD\n"
-                f"  A[Start: Matrix A or Equation] --> B{{Evaluate Determinant / Roots}}\n"
-                f"  B -->|det(A) = 0| C[Zero Eigenvalue Detected]\n"
-                f"  B -->|det(A) != 0| D[Full Rank / Invertible]\n"
-                f"  C --> E[Calculate Eigenspace Dimension: Nullity >= 1]\n"
-                f"  E --> F[Apply Rank-Nullity: dim(V) = rank + nullity]\n"
-                f"  D --> G[Trivial Kernel: Nullity = 0]\n"
+                f"  A[Start: Matrix A or Linear Map T] --> B{{Evaluate Determinant / Roots}}\n"
+                f"  B -->|det(A) = 0| C[Zero Eigenvalue Detected: Kernel Non-Trivial]\n"
+                f"  B -->|det(A) != 0| D[Full Rank: Trivial Kernel (Nullity = 0)]\n"
+                f"  C --> E[Calculate Kernel Dimension: Nullity >= 1]\n"
+                f"  E --> F[Apply Rank-Nullity Theorem: dim(V) = rank(T) + nullity(T)]\n"
+                f"  D --> G[Invertible Mapping: dim(V) = rank(T)]\n"
                 f"```\n\n"
-                f"This decision tree ensures you verify whether a matrix possesses zero eigenvalues before calculating eigenspaces."
+                f"This decision tree confirms whether a linear transformation possesses non-trivial kernel solutions."
             )
+        elif any(k in lowered_query for k in ["who are you", "what is your name", "what is ur name", "who r u"]):
+            reply_content = (
+                f"I am **Shubh AI Assistant**, an autonomous academic reasoning agent for GapFinder. "
+                f"I specialize in evaluating curriculum telemetry, calculating mathematical derivations, explaining core theorems, "
+                f"and generating adaptive revision schedules to eliminate knowledge gaps."
+            )
+        elif any(k in lowered_query for k in ["my name", "who am i"]):
+            reply_content = f"You are **{student_name}**, currently preparing your coursework in GapFinder."
         elif context_str and retrieved_chunks:
             primary_chunk = retrieved_chunks[0]
             reply_content = (
-                f"Hello {student_name}! Based on your uploaded course material (*{primary_chunk['document_title']}*):\n\n"
+                f"Based on your uploaded course material (*{primary_chunk['document_title']}*):\n\n"
                 f"{primary_chunk['source_text'][:380]}...\n\n"
-                f"This relates directly to **{topic}**. Would you like me to synthesize a practice question on this concept?"
+                f"This foundational section addresses **{topic}**."
             )
         else:
             reply_content = (
-                f"Hello {student_name}! Regarding **{topic}**:\n\n"
-                f"I am here to guide your study sessions and help you master course concepts. What specific problem, derivation, or formula would you like to review together?"
+                f"Regarding **{topic}**:\n\n"
+                f"The core principle connects algebraic roots to geometric kernel dimensions through the Rank-Nullity Theorem: "
+                f"\\(\\dim(V) = \\text{{rank}}(T) + \\text{{nullity}}(T)\\). Let me know what specific derivation or problem you would like to work through."
             )
 
     citations = []
