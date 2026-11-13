@@ -91,6 +91,10 @@ async def root_clerk_webhook(request: Request):
 
 @app.get("/")
 def root():
+    index_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gapfinder-app", "dist", "index.html")
+    if os.path.exists(index_file):
+        from fastapi.responses import FileResponse
+        return FileResponse(index_file)
     return {
         "status": "online",
         "service": "GapFinder AI EdTech Backend & API",
@@ -99,6 +103,7 @@ def root():
         "health": "/api/health"
     }
 
+@app.get("/health")
 @app.get("/api/health")
 def health_check():
     return {
