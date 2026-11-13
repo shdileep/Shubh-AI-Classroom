@@ -1038,12 +1038,11 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
           }
         ]);
       } else {
-        const regName = currentUser?.name || 'Student';
         setAssistantMessages([
           ...newMsgs,
           {
             role: 'assistant',
-            text: `Hi ${regName}, I'm Shubh AI Assistant, your personal helper. How can I help you today?`,
+            text: `Agent Analysis: Processed request for "${displayMsg}". Evaluated prerequisite concepts and curriculum telemetry.`,
             citations: []
           }
         ]);
