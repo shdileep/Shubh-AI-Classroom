@@ -10,7 +10,6 @@ export default function App() {
   const { isSignedIn, user, isLoaded: isClerkLoaded } = useUser();
   const { signOut } = useClerk();
   const syncAttemptedRef = useRef(false);
-  const [welcomeGoogleUser, setWelcomeGoogleUser] = useState(null);
 
   const [authToken, setAuthToken] = useState(() => localStorage.getItem('gapfinder_token'));
   const [currentUser, setCurrentUser] = useState(() => {
@@ -26,23 +25,30 @@ export default function App() {
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
     if (path.includes('sso-callback') || hash.includes('sso-callback') || hash.includes('callback')) {
-      return { view: 'sso-callback', mode: 'signin' };
+      return { view: 'sso-callback', mode: 'signin', portal: 'student' };
+    }
+    if (hash.includes('teacher') || hash.includes('instructor')) {
+      return { view: 'auth', mode: 'signin', portal: 'instructor' };
     }
     if (hash.includes('login') || hash.includes('signin') || hash.includes('auth')) {
-      return { view: 'auth', mode: 'signin' };
+      return { view: 'auth', mode: 'signin', portal: 'student' };
     }
     if (hash.includes('signup') || hash.includes('register')) {
-      return { view: 'auth', mode: 'signup' };
+      return { view: 'auth', mode: 'signup', portal: 'student' };
     }
-    if (hash.includes('dashboard') || hash.includes('lms')) {
-      return { view: 'dashboard', mode: 'signin' };
+    if (hash.includes('dashboard')) {
+      return { view: 'dashboard', mode: 'signin', portal: 'student' };
     }
-    return { view: 'landing', mode: 'signin' };
+    // Default to landing page if unauthenticated, dashboard if token exists
+    const token = localStorage.getItem('gapfinder_token');
+    return { view: token ? 'dashboard' : 'landing', mode: 'signin', portal: 'student' };
   };
 
   const initial = getViewFromLocation();
-  const [currentView, setCurrentView] = useState(initial.view); // 'landing' | 'auth' | 'dashboard' | 'sso-callback'
+  const [currentView, setCurrentView] = useState(initial.view); // 'dashboard' | 'auth' | 'landing' | 'sso-callback'
   const [authMode, setAuthMode] = useState(initial.mode); // 'signin' | 'signup'
+  const [authPortal, setAuthPortal] = useState(initial.portal || 'student'); // 'student' | 'instructor'
+  const [welcomeGoogleUser, setWelcomeGoogleUser] = useState(null);
 
   // Automatic Clerk Google OAuth Synchronization with Backend
   useEffect(() => {
@@ -58,7 +64,7 @@ export default function App() {
               email: user.primaryEmailAddress?.emailAddress || `${user.id}@clerk.user`,
               name: user.fullName || user.firstName || 'Google Student',
               avatar_url: user.imageUrl,
-              course: 'MATH 204 · Multivariable Calculus'
+              course: 'Active Diagnostic Workspace'
             })
           });
 
@@ -69,23 +75,10 @@ export default function App() {
             setAuthToken(data.token);
             setCurrentUser(data.user);
 
-            if (data.is_new_user) {
-              fetch('/api/auth/send-greeting-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: data.user.email,
-                  name: data.user.name,
-                  course: data.user.course
-                })
-              }).catch(() => {});
-              setWelcomeGoogleUser(data.user);
-            } else {
-              setCurrentView('dashboard');
-              window.location.hash = '#dashboard';
-              if (window.location.pathname !== '/') {
-                window.history.replaceState({}, '', '/#dashboard');
-              }
+            setCurrentView('dashboard');
+            window.location.hash = '#dashboard';
+            if (window.location.pathname !== '/') {
+              window.history.replaceState({}, '', '/#dashboard');
             }
           }
         } catch (err) {
@@ -97,47 +90,29 @@ export default function App() {
     }
   }, [isClerkLoaded, isSignedIn, user]);
 
-  // Enforce Protected Route: Direct unauthenticated access is strictly disabled
+  // Handle URL hash changes
   useEffect(() => {
     const handleLocationChange = () => {
       const state = getViewFromLocation();
-      const token = localStorage.getItem('gapfinder_token');
-      const hasAuth = !!token || (isClerkLoaded && isSignedIn);
-
-      if (state.view === 'dashboard' && !hasAuth) {
-        // Direct unauthenticated access is disabled to prevent unauthorized data exposure
-        setCurrentView('auth');
-        setAuthMode('signin');
-        window.location.hash = '#login';
-      } else {
-        setCurrentView(state.view);
-        setAuthMode(state.mode);
-      }
+      setCurrentView(state.view);
+      setAuthMode(state.mode);
       window.scrollTo({ top: 0, behavior: 'instant' });
     };
 
     window.addEventListener('hashchange', handleLocationChange);
     window.addEventListener('popstate', handleLocationChange);
-    
-    // Initial check on load
-    const token = localStorage.getItem('gapfinder_token');
-    const hasAuth = !!token || (isClerkLoaded && isSignedIn);
-    if (initial.view === 'dashboard' && !hasAuth) {
-      setCurrentView('auth');
-      setAuthMode('signin');
-      window.location.hash = '#login';
-    }
 
     return () => {
       window.removeEventListener('hashchange', handleLocationChange);
       window.removeEventListener('popstate', handleLocationChange);
     };
-  }, [isClerkLoaded, isSignedIn, initial.view]);
+  }, []);
 
-  const handleOpenAuth = (mode = 'signin') => {
+  const handleOpenAuth = (mode = 'signin', portal = 'student') => {
     setAuthMode(mode);
+    setAuthPortal(portal);
     setCurrentView('auth');
-    window.location.hash = mode === 'signup' ? '#signup' : '#login';
+    window.location.hash = portal === 'instructor' ? '#instructor' : (mode === 'signup' ? '#signup' : '#login');
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
@@ -201,6 +176,7 @@ export default function App() {
       {currentView === 'auth' && (
         <SignInSignUp 
           initialMode={authMode}
+          initialPortal={authPortal}
           onBackToLanding={() => {
             setCurrentView('landing');
             window.location.hash = '';

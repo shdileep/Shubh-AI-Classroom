@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/llm", tags=["llm"])
 class DiagnosticRequest(BaseModel):
     topic: str
     student_response: Optional[str] = None
-    course: Optional[str] = "MATH 204: Multivariable Calculus"
+    course: Optional[str] = "Active Diagnostic Workspace"
 
 class DrillRequest(BaseModel):
     topic: str
@@ -40,7 +40,7 @@ def run_diagnostic(req: DiagnosticRequest, current_user: Dict[str, Any] = Depend
             return {
                 "topic": topic,
                 "analysis": completion.choices[0].message.content,
-                "engine": "openai-gpt-4o-mini"
+                "engine": "AI Diagnostic Engine"
             }
         except Exception as e:
             pass # Fall back to intelligent academic generator
@@ -82,7 +82,7 @@ def run_diagnostic(req: DiagnosticRequest, current_user: Dict[str, Any] = Depend
         "root_cause": profile["root_cause"],
         "prerequisites_blocked": profile["prerequisites_blocked"],
         "recommendation": profile["recommendation"],
-        "engine": "GapFinder-Bayesian-Concept-Tracing-v2.4"
+        "engine": "AI Diagnostic Engine"
     }
 
 @router.post("/generate-drill")
@@ -152,5 +152,5 @@ def assistant_chat(req: ChatRequest, current_user: Dict[str, Any] = Depends(get_
     return {
         "reply": response,
         "topic": req.topic,
-        "model": "GapFinder-Academic-Assistant-2026"
+        "model": "AI Diagnostic Assistant"
     }

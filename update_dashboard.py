@@ -58,7 +58,7 @@ new_sig = """export default function LmsDashboard({ onLogout, onBackToLanding, c
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ topic, course: 'MATH 204: Multivariable Calculus' })
+        body: JSON.stringify({ topic, course: 'Active Diagnostic Workspace' })
       });
       const data = await res.json();
       setLlmModal({ type: 'diagnostic', topic, data });

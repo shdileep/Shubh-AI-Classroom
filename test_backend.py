@@ -76,7 +76,7 @@ clerk_google_payload = {
     "email": "sarah.connor@stanford.edu",
     "name": "Sarah Connor",
     "avatar_url": "https://lh3.googleusercontent.com/a/student-avatar.jpg",
-    "course": "MATH 204 · Multivariable Calculus"
+    "course": "Active Diagnostic Workspace"
 }
 status, res = request(f"{BASE}/api/auth/clerk-sync", method="POST", data=clerk_google_payload)
 print("Status:", status, "Success:", "token" in res, "User:", res.get("user", {}).get("name"))

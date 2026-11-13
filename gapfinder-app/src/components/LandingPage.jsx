@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 const DRAWER_DATA = {
   diagnostics: {
     category: 'Platform',
-    title: 'Adaptive Concept Diagnostics',
+    title: 'Adaptive Concept Assessments',
     content: (
       <div className="space-y-5">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ECE8DF] text-[#0A0D0E] text-xs font-semibold">
-          <span>Diagnostic Engine</span>
+          <span>Adaptive Engine</span>
         </div>
         <h2 className="text-2xl font-extrabold text-[#0A0D0E] font-sans">Bayesian Knowledge Tracing & Socratic Drills</h2>
         <p className="text-sm text-[#5C6368] leading-relaxed">
@@ -15,7 +15,7 @@ const DRAWER_DATA = {
         </p>
         <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-[#FFFFFF] border border-[#E4DFD5]">
           <div>
-            <div className="text-xs text-[#5C6368]">Mean Diagnostic Time</div>
+            <div className="text-xs text-[#5C6368]">Mean Assessment Time</div>
             <div className="text-xl font-extrabold text-[#0A0D0E]">8.4 mins</div>
           </div>
           <div>
@@ -128,7 +128,7 @@ const DRAWER_DATA = {
         </div>
         <h2 className="text-2xl font-extrabold text-[#0A0D0E] font-sans">Academic Concierge & Support</h2>
         <p className="text-sm text-[#5C6368] leading-relaxed">
-          Need help mapping your syllabus, troubleshooting diagnostic reports, or coordinating group study accounts? Our team is available 24/7 for students and faculty.
+          Need help mapping your syllabus, reviewing progress reports, or coordinating group study accounts? Our team is available 24/7 for students and faculty.
         </p>
       </div>
     )
@@ -143,7 +143,7 @@ const DRAWER_DATA = {
         </div>
         <h2 className="text-2xl font-extrabold text-[#0A0D0E] font-sans">Campus-Wide Departmental Licensing</h2>
         <p className="text-sm text-[#5C6368] leading-relaxed">
-          GapFinder AI offers institutional site licenses for departments and universities with central single-sign-on (SSO), LMS integration, and custom diagnostic tailoring for faculty course coordinators.
+          GapFinder AI offers institutional site licenses for departments and universities with central single-sign-on (SSO), LMS integration, and custom curriculum tailoring for faculty course coordinators.
         </p>
       </div>
     )
@@ -158,7 +158,7 @@ const DRAWER_DATA = {
         </div>
         <h2 className="text-2xl font-extrabold text-[#0A0D0E] font-sans">FERPA, GDPR & Academic Privacy Commitment</h2>
         <p className="text-sm text-[#5C6368] leading-relaxed">
-          At GapFinder AI, student data ownership is non-negotiable. Student submissions, diagnostic attempts, and coursework materials are encrypted at rest and in transit (AES-256 / TLS 1.3). Student data is never used to train public foundation models.
+          At GapFinder AI, student data ownership is non-negotiable. Student submissions, assessment attempts, and coursework materials are encrypted at rest and in transit (AES-256 / TLS 1.3). Student data is never used to train public foundation models.
         </p>
       </div>
     )
@@ -173,7 +173,7 @@ const DRAWER_DATA = {
         </div>
         <h2 className="text-2xl font-extrabold text-[#0A0D0E] font-sans">Terms of Service (2026 Edition)</h2>
         <p className="text-sm text-[#5C6368] leading-relaxed">
-          By accessing GapFinder AI, you agree to academic integrity rules and acceptable usage policies. The diagnostic tools are intended to guide legitimate independent study and exam preparation.
+          By accessing GapFinder AI, you agree to academic integrity rules and acceptable usage policies. The learning tools are intended to guide legitimate independent study and exam preparation.
         </p>
       </div>
     )
@@ -186,11 +186,11 @@ const DRAWER_DATA = {
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ECE8DF] text-[#0A0D0E] text-xs font-semibold">
           <span>Inquiries</span>
         </div>
-        <h2 className="text-2xl font-extrabold text-[#0A0D0E] font-sans">Send an Academic or Partnership Inquiry</h2>
-        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); alert('Inquiry submitted! Our academic advisors will reach out within 24 hours.'); }}>
+        <h2 className="text-2xl font-extrabold text-[#0A0D0E] font-sans">Send an Inquiry or Feedback</h2>
+        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); alert('Inquiry submitted! Our team will reach out within 24 hours.'); }}>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-[#0A0D0E]">University Email</label>
-            <input type="email" required placeholder="alex@university.edu" className="w-full px-3 py-2 text-xs rounded-lg border border-[#D8D2C5] bg-[#FFFFFF] text-[#0A0D0E] focus:outline-none" />
+            <label className="text-xs font-semibold text-[#0A0D0E]">Email Address</label>
+            <input type="email" required placeholder="alex@example.com" className="w-full px-3 py-2 text-xs rounded-lg border border-[#D8D2C5] bg-[#FFFFFF] text-[#0A0D0E] focus:outline-none" />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-semibold text-[#0A0D0E]">Subject / Inquiring Department</label>
@@ -241,12 +241,19 @@ export default function LandingPage({ onOpenAuth, onOpenDashboard }) {
 <header className="fixed top-0 left-0 right-0 h-16 z-50 bg-[#FAF8F5]/90 backdrop-blur-md border-b border-[#E4DFD5] transition-all">
 <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
 <div className="flex items-center gap-8">
-<a className="flex items-center gap-2.5 group" href="#"><div className="w-8 h-8 rounded-lg bg-[#0A0D0E] flex items-center justify-center text-[#FAF8F5] shadow-xs group-hover:scale-105 transition-transform"><svg className="w-4.5 h-4.5 text-[#FAF8F5]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.5L20.5 7.5V16.5L12 21.5L3.5 16.5V7.5L12 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"></path><path d="M12 2.5V21.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4"></path><circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.4"></circle><circle cx="12" cy="12" r="1.2" fill="#0DFA6C"></circle><path d="M6 8.5L18 15.5M6 15.5L18 8.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.35"></path></svg></div><div className="flex items-baseline gap-1.5"><span className="font-serif italic text-xl tracking-tight text-[#0A0D0E] font-medium">GapFinder</span><span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[#0A0D0E] text-[#FAF8F5]">AI</span></div></a>
-<nav className="hidden md:flex items-center gap-7 text-sm font-medium text-[#5C6368] font-sans"><a className="hover:text-[#0A0D0E] transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" }); }} href="#how-it-works">How It Works</a><a className="hover:text-[#0A0D0E] transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); document.getElementById("diagnostics")?.scrollIntoView({ behavior: "smooth" }); }} href="#diagnostics">Diagnostics</a><a className="hover:text-[#0A0D0E] transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); onOpenDashboard(); }} href="#dashboard">Dashboard</a></nav>
+<a className="flex items-center gap-2.5 group" href="#"><div className="w-8 h-8 rounded-lg bg-[#0A0D0E] flex items-center justify-center text-[#FAF8F5] shadow-xs group-hover:scale-105 transition-transform"><svg className="w-4.5 h-4.5 text-[#FAF8F5]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.5L20.5 7.5V16.5L12 21.5L3.5 16.5V7.5L12 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"></path><path d="M12 2.5V21.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4"></path><circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.4"></circle><circle cx="12" cy="12" r="1.2" fill="#15803D"></circle><path d="M6 8.5L18 15.5M6 15.5L18 8.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.35"></path></svg></div><div className="flex items-baseline gap-1.5"><span className="font-serif italic text-xl tracking-tight text-[#0A0D0E] font-medium">GapFinder</span><span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[#0A0D0E] text-[#FAF8F5]">AI</span></div></a>
+<nav className="hidden md:flex items-center gap-7 text-sm font-medium text-[#5C6368] font-sans">
+  <a className="hover:text-[#0A0D0E] transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" }); }} href="#how-it-works">How It Works</a>
+  <a className="hover:text-[#0A0D0E] transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); document.getElementById("diagnostics")?.scrollIntoView({ behavior: "smooth" }); }} href="#diagnostics">Assessments</a>
+  <a className="text-[#003B1B] hover:text-black font-semibold transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => { e.preventDefault(); onOpenAuth("signin", "instructor"); }} href="#instructor">
+    <span>👨‍🏫</span>
+    <span>Instructor Portal</span>
+  </a>
+</nav>
 </div>
 <div className="flex items-center gap-4">
-<button type="button" onClick={() => onOpenAuth("signin")} className="text-sm font-semibold text-[#2B3033] hover:text-[#0A0D0E] transition-colors hidden sm:block font-sans">Sign in</button>
-<a className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold text-[#FAF8F5] bg-[#0A0D0E] hover:bg-[#1E2327] px-4 py-2.5 rounded-lg shadow-sm hover:shadow transition-all font-sans cursor-pointer" onClick={() => onOpenAuth("signup")} href="#pre-footer-cta"><span>Get Started Free</span><svg className="w-3.5 h-3.5 text-current" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8H13M9.5 4.5L13 8L9.5 11.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"></path></svg></a>
+<button type="button" onClick={() => onOpenAuth("signin", "student")} className="text-sm font-semibold text-[#2B3033] hover:text-[#0A0D0E] transition-colors hidden sm:block font-sans">Student Sign In</button>
+<a className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold text-[#FAF8F5] bg-[#0A0D0E] hover:bg-[#1E2327] px-4 py-2.5 rounded-lg shadow-sm hover:shadow transition-all font-sans cursor-pointer" onClick={() => onOpenAuth("signup", "student")} href="#pre-footer-cta"><span>Get Started Free</span><svg className="w-3.5 h-3.5 text-current" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8H13M9.5 4.5L13 8L9.5 11.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"></path></svg></a>
 </div>
 </div>
 </header>
@@ -268,15 +275,50 @@ export default function LandingPage({ onOpenAuth, onOpenDashboard }) {
             GapFinder analyses your course slides and assignments to pinpoint exactly what concepts need revision before exam day.
           </p>
 {/*  CTAs  */}
-<div className="reveal-on-scroll reveal-delay-2 flex flex-wrap items-center gap-3 w-full sm:w-auto mb-10 is-visible">
-<a className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#0A0D0E] hover:bg-[#1E2327] text-[#FAF8F5] font-bold text-sm shadow-md transition-all hover:-translate-y-0.5" href="#signup" onClick={(e) => { e.preventDefault(); onOpenAuth("signup"); }}>
-<span>Start Free Diagnostic</span>
+<div className="reveal-on-scroll reveal-delay-2 flex flex-wrap items-center gap-3 w-full sm:w-auto mb-6 is-visible">
+<a className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#0A0D0E] hover:bg-[#1E2327] text-[#FAF8F5] font-bold text-sm shadow-md transition-all hover:-translate-y-0.5" href="#signup" onClick={(e) => { e.preventDefault(); onOpenAuth("signup", "student"); }}>
+<span>Start Free Assessment</span>
 <svg className="w-4 h-4 text-[#FAF8F5]" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8H13M9.5 4.5L13 8L9.5 11.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"></path></svg>
 </a>
 <a className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-[#D8D2C5] bg-[#FFFFFF] hover:bg-[#F5F2EB] text-[#0A0D0E] font-semibold text-sm shadow-xs transition-all" href="#demo">
 <svg className="w-5 h-5 text-[#5C6368]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.5"></circle><circle cx="12" cy="12" r="6.5" stroke="currentColor" strokeWidth="0.75" strokeDasharray="2 2" strokeOpacity="0.6"></circle><polygon points="10,8.5 16,12 10,15.5" fill="currentColor"></polygon></svg>
 <span>Watch Demo</span>
 </a>
+</div>
+
+{/* Dual Portal Gateway Selection */}
+<div className="reveal-on-scroll reveal-delay-2 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg mb-8 is-visible">
+  <div 
+    onClick={() => onOpenAuth('signin', 'student')}
+    className="group p-3.5 rounded-xl bg-white hover:bg-[#FAF8F5] border border-[#E4DFD5] hover:border-black/40 shadow-xs hover:shadow-md transition-all cursor-pointer text-left"
+  >
+    <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center gap-1.5 font-bold text-xs text-[#0A0D0E]">
+        <span>🎓</span>
+        <span>Student Portal</span>
+      </div>
+      <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-black/5 text-[#0A0D0E] group-hover:bg-black group-hover:text-white transition-colors">Enter</span>
+    </div>
+    <p className="text-[11px] text-[#5C6368] leading-tight">
+      Take assessments, discover knowledge gaps, and track adaptive mastery.
+    </p>
+  </div>
+
+  <div 
+    onClick={() => onOpenAuth('signin', 'instructor')}
+    className="group p-3.5 rounded-xl bg-[#003B1B]/5 hover:bg-[#003B1B]/10 border border-[#003B1B]/20 hover:border-[#003B1B]/40 shadow-xs hover:shadow-md transition-all cursor-pointer text-left"
+  >
+    <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center gap-1.5 font-bold text-xs text-[#003B1B]">
+        <span>👨‍🏫</span>
+        <span>Instructor Portal</span>
+      </div>
+      <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#003B1B]/15 text-[#003B1B] group-hover:bg-[#003B1B] group-hover:text-white transition-colors">Faculty</span>
+    </div>
+    <p className="text-[11px] text-[#5C6368] leading-tight">
+      Monitor cohorts, identify weak topics, and assign remedial drills.
+    </p>
+  </div>
 </div>
 {/*  Clean University Logos Bar  */}
 
@@ -339,7 +381,7 @@ export default function LandingPage({ onOpenAuth, onOpenDashboard }) {
 <div className="reveal-on-scroll reveal-delay-1 p-6 rounded-2xl border border-[#E4DFD5] bg-[#FFFFFF] shadow-sm hover:border-[#C2B8A3] transition-all flex flex-col justify-between is-visible">
 <div>
 <div className="w-10 h-10 rounded-xl bg-[#FAF8F5] border border-[#E4DFD5] flex items-center justify-center text-[#0A0D0E] mb-5"><svg className="w-5 h-5 text-[#0A0D0E]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.5"></circle><circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.25" strokeOpacity="0.7"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle><line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"></line><line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"></line><line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"></line><line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"></line></svg></div>
-<h3 className="text-base font-bold text-[#0A0D0E] mb-2 font-sans">Targeted Diagnostics</h3>
+<h3 className="text-base font-bold text-[#0A0D0E] mb-2 font-sans">Targeted Assessments</h3>
 <p className="text-[#5C6368] text-sm leading-relaxed">
               Adaptive questions identify conceptual blockers quickly without testing what you already understand well.
             </p>
@@ -391,7 +433,7 @@ export default function LandingPage({ onOpenAuth, onOpenDashboard }) {
 <div className="lg:col-span-7">
 <div className="reveal-on-scroll mb-8 is-visible">
 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFFFFF] border border-[#E4DFD5] text-[#2B3033] text-xs font-semibold mb-3 shadow-xs">
-<span>Diagnostic Assessment</span>
+<span>Skill Assessment</span>
 </div>
 <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#0A0D0E] mb-3 font-sans">
               Understand what you actually know.
@@ -487,7 +529,7 @@ export default function LandingPage({ onOpenAuth, onOpenDashboard }) {
             </div>
 <div>
 <div className="text-sm font-bold text-[#FAF8F5] font-sans">Alex Chen</div>
-<div className="text-xs text-[#8E979E]">MATH 204 · Multivariable Calculus</div>
+<div className="text-xs text-[#8E979E]">Foundational Learning Workspace</div>
 </div>
 </div>
 <div className="flex items-center gap-3">
@@ -617,11 +659,11 @@ export default function LandingPage({ onOpenAuth, onOpenDashboard }) {
           Learn Smarter. Prepare Better.
         </h2>
 <p className="text-[#C2B8A3] text-base leading-relaxed max-w-xl mx-auto mb-8">
-          Focus your revision hours on what actually shifts your grade. Run your first course diagnostic in minutes.
+          Focus your revision hours on what actually shifts your grade. Run your first course assessment in minutes.
         </p>
 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
 <a className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-[#FAF8F5] hover:bg-[#ECE8DF] text-[#0A0D0E] font-bold text-sm transition-all shadow-md hover:scale-105" href="#signup" onClick={(e) => { e.preventDefault(); onOpenAuth("signup"); }}>
-<span>Start Free Diagnostic</span>
+<span>Start Free Assessment</span>
 <svg className="w-4 h-4 text-current" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8H13M9.5 4.5L13 8L9.5 11.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"></path></svg>
 </a>
 </div>
@@ -637,13 +679,13 @@ export default function LandingPage({ onOpenAuth, onOpenDashboard }) {
 <div className="grid grid-cols-2 md:grid-cols-5 gap-10 pb-12 border-b border-[#1C2023]">
 {/*  Brand Column  */}
 <div className="col-span-2">
-<div className="flex items-center gap-2.5 mb-4"><div className="w-8 h-8 rounded-lg bg-[#FAF8F5] flex items-center justify-center text-[#0A0D0E] shadow-xs"><svg className="w-4.5 h-4.5 text-[#0A0D0E]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.5L20.5 7.5V16.5L12 21.5L3.5 16.5V7.5L12 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"></path><path d="M12 2.5V21.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4"></path><circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.4"></circle><circle cx="12" cy="12" r="1.2" fill="#0DFA6C"></circle><path d="M6 8.5L18 15.5M6 15.5L18 8.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.35"></path></svg></div><div className="flex items-baseline gap-1.5"><span className="font-serif italic text-xl tracking-tight text-[#FAF8F5] font-medium">GapFinder</span><span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[#FAF8F5] text-[#0A0D0E]">AI</span></div></div>
-<p className="text-[#8E979E] leading-relaxed text-xs max-w-sm mb-6">The diagnostic revision companion designed for advanced STEM students and academic faculty.</p>
+<div className="flex items-center gap-2.5 mb-4"><div className="w-8 h-8 rounded-lg bg-[#FAF8F5] flex items-center justify-center text-[#0A0D0E] shadow-xs"><svg className="w-4.5 h-4.5 text-[#0A0D0E]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.5L20.5 7.5V16.5L12 21.5L3.5 16.5V7.5L12 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"></path><path d="M12 2.5V21.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4"></path><circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.4"></circle><circle cx="12" cy="12" r="1.2" fill="#15803D"></circle><path d="M6 8.5L18 15.5M6 15.5L18 8.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.35"></path></svg></div><div className="flex items-baseline gap-1.5"><span className="font-serif italic text-xl tracking-tight text-[#FAF8F5] font-medium">GapFinder</span><span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[#FAF8F5] text-[#0A0D0E]">AI</span></div></div>
+<p className="text-[#8E979E] leading-relaxed text-xs max-w-sm mb-6">The personalized revision companion designed for advanced STEM students and academic faculty.</p>
 </div>
 {/*  Links  */}
 <div>
 <h4 className="text-xs font-semibold uppercase tracking-wider text-[#FAF8F5] mb-4">Platform</h4>
-<ul className="space-y-2.5"><li><button type="button" onClick={() => openDrawer("diagnostics")} className="hover:text-[#FAF8F5] transition-colors text-left">Diagnostics</button></li><li><button type="button" onClick={() => openDrawer("dashboard")} className="hover:text-[#FAF8F5] transition-colors text-left">Dashboard</button></li><li><button type="button" onClick={() => openDrawer("gap-mapping")} className="hover:text-[#FAF8F5] transition-colors text-left">Gap Mapping</button></li><li><button type="button" onClick={() => openDrawer("lms-sync")} className="hover:text-[#FAF8F5] transition-colors text-left">LMS Sync</button></li></ul>
+<ul className="space-y-2.5"><li><button type="button" onClick={() => openDrawer("diagnostics")} className="hover:text-[#FAF8F5] transition-colors text-left">Assessments</button></li><li><button type="button" onClick={() => openDrawer("dashboard")} className="hover:text-[#FAF8F5] transition-colors text-left">Dashboard</button></li><li><button type="button" onClick={() => openDrawer("gap-mapping")} className="hover:text-[#FAF8F5] transition-colors text-left">Gap Mapping</button></li><li><button type="button" onClick={() => openDrawer("lms-sync")} className="hover:text-[#FAF8F5] transition-colors text-left">LMS Sync</button></li></ul>
 </div>
 <div>
 <h4 className="text-xs font-semibold uppercase tracking-wider text-[#FAF8F5] mb-4">Resources</h4>

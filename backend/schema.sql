@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'student',
-    course VARCHAR(255) DEFAULT 'MATH 204 · Multivariable Calculus',
+    course VARCHAR(255) DEFAULT 'Foundational STEM & Computing',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

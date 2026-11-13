@@ -35,7 +35,7 @@ def run_tests():
         "name": TEST_NAME,
         "email": TEST_EMAIL,
         "password": "Password123!",
-        "course": "MATH 204 · Multivariable Calculus"
+        "course": "Active Diagnostic Workspace"
     })
     print(f"Status Code: {res.status_code} (Expected 403)")
     assert res.status_code == 403, f"Expected 403 Forbidden, got {res.status_code}: {res.text}"
@@ -169,7 +169,7 @@ def run_tests():
         "name": TEST_NAME,
         "email": TEST_EMAIL,
         "password": "StrongPassword2026!",
-        "course": "MATH 204 · Multivariable Calculus"
+        "course": "Active Diagnostic Workspace"
     })
     print(f"Signup status: {res_signup.status_code}, Response: {res_signup.json()['message']}")
     assert res_signup.status_code == 200, f"Signup failed: {res_signup.text}"

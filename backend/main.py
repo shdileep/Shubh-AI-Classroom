@@ -5,7 +5,11 @@ from contextlib import asynccontextmanager
 
 from backend.database import init_db, get_connection, IS_POSTGRES
 from backend.auth import hash_password
-from backend.routers import auth, dashboard, llm
+from backend.routers import (
+    auth, dashboard, llm, documents, topics,
+    assessments, gaps, revision, practice,
+    analytics, history, assistant, personal, teacher, student_assignments
+)
 
 def seed_default_user():
     conn = get_connection()
@@ -18,43 +22,17 @@ def seed_default_user():
             if IS_POSTGRES:
                 cur.execute("""
                     INSERT INTO users (name, email, password_hash, role, course)
-                    VALUES ('Alex Chen', 'alex.chen@stanford.edu', %s, 'student', 'MATH 204 · Multivariable Calculus')
-                    RETURNING id;
+                    VALUES ('Alex Chen', 'alex.chen@stanford.edu', %s, 'student', 'Foundational STEM & Computing');
                 """, (pwd_hash,))
-                user_id = cur.fetchone()[0]
-                cur.execute("""
-                    INSERT INTO knowledge_gaps (user_id, topic, mastery_score, priority, status)
-                    VALUES 
-                    (%s, 'Quadratic Roots & Nullity', 32, 'High', 'Critical Gap'),
-                    (%s, 'Matrix Rank & Vector Pivot', 41, 'High', 'Needs Review'),
-                    (%s, 'Jordan Canonical Form', 45, 'High', 'Needs Review'),
-                    (%s, 'Orthogonal Projections', 68, 'Medium', 'In Progress'),
-                    (%s, 'Vector Subspaces', 71, 'Medium', 'In Progress'),
-                    (%s, 'Linear Systems & Solvability', 96, 'Low', 'Mastered'),
-                    (%s, 'Matrix Determinants', 94, 'Low', 'Mastered');
-                """, (user_id, user_id, user_id, user_id, user_id, user_id, user_id))
             else:
                 cur.execute("""
                     INSERT INTO users (name, email, password_hash, role, course)
-                    VALUES ('Alex Chen', 'alex.chen@stanford.edu', ?, 'student', 'MATH 204 · Multivariable Calculus');
+                    VALUES ('Alex Chen', 'alex.chen@stanford.edu', ?, 'student', 'Foundational STEM & Computing');
                 """, (pwd_hash,))
-                user_id = cur.lastrowid
-                cur.executemany("""
-                    INSERT INTO knowledge_gaps (user_id, topic, mastery_score, priority, status)
-                    VALUES (?, ?, ?, ?, ?);
-                """, [
-                    (user_id, 'Quadratic Roots & Nullity', 32, 'High', 'Critical Gap'),
-                    (user_id, 'Matrix Rank & Vector Pivot', 41, 'High', 'Needs Review'),
-                    (user_id, 'Jordan Canonical Form', 45, 'High', 'Needs Review'),
-                    (user_id, 'Orthogonal Projections', 68, 'Medium', 'In Progress'),
-                    (user_id, 'Vector Subspaces', 71, 'Medium', 'In Progress'),
-                    (user_id, 'Linear Systems & Solvability', 96, 'Low', 'Mastered'),
-                    (user_id, 'Matrix Determinants', 94, 'Low', 'Mastered'),
-                ])
             conn.commit()
-            print("[Database] Seeded default student user: alex.chen@stanford.edu (password: password123)")
+            print("[Database] Ensured student user account exists: alex.chen@stanford.edu")
     except Exception as e:
-        print(f"[Database] Error checking/seeding default user: {e}")
+        print(f"[Database] Error checking default user: {e}")
     finally:
         cur.close()
         conn.close()
@@ -88,12 +66,28 @@ app.add_middleware(
 # Include Routers
 app.include_router(auth.router)
 app.include_router(dashboard.router)
+app.include_router(documents.router)
+app.include_router(topics.router)
+app.include_router(assessments.router)
+app.include_router(gaps.router)
+app.include_router(revision.router)
+app.include_router(practice.router)
+app.include_router(analytics.router)
+app.include_router(history.router)
+app.include_router(assistant.router)
+app.include_router(personal.router)
+app.include_router(teacher.router)
+app.include_router(student_assignments.router)
 app.include_router(llm.router)
 
-# Mount direct /api/webhooks/resend endpoint
+# Mount direct /api/webhooks/resend and /api/webhooks/clerk endpoints
 @app.post("/api/webhooks/resend")
 async def root_resend_webhook(request: Request):
     return await auth.resend_webhook(request)
+
+@app.post("/api/webhooks/clerk")
+async def root_clerk_webhook(request: Request):
+    return await auth.clerk_webhook(request)
 
 @app.get("/api/health")
 def health_check():

@@ -220,3 +220,105 @@ The {app_name} Team
 Registered email: {email} | (c) 2026 {app_name}
 """
     return subject, html_content, text_content
+
+def get_revision_reminder_email_content(
+    email: str,
+    name: str,
+    session_title: str,
+    scheduled_date: str,
+    scheduled_time: str,
+    topic_name: str = "Core Concepts",
+    app_name: str = "GapFinder AI"
+) -> Tuple[str, str, str]:
+    """
+    Returns (subject, html_content, text_content) for exciting 5-minute revision session reminder email.
+    """
+    first_name = resolve_first_name(name) if name else resolve_first_name(email.split("@")[0].capitalize())
+    subject = f"⚡ Revision Reminder: Your '{session_title}' Session is Primed & Ready!"
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+  <style>
+    body {{ margin: 0; padding: 32px 16px; background-color: #F5F2EC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1C2024; -webkit-font-smoothing: antialiased; }}
+    .container {{ max-width: 580px; margin: 0 auto; background: #FAF8F5; border: 1px solid #ECE6DC; border-radius: 24px; overflow: hidden; box-shadow: 0 12px 36px rgba(13,17,23,0.06); }}
+    .top-bar {{ height: 6px; width: 100%; background: linear-gradient(90deg, #15803D 0%, #0a2d21 50%, #0dfa6c 100%); }}
+    .content {{ padding: 36px 32px; }}
+    .brand-title {{ font-family: Georgia, serif; font-style: italic; font-size: 22px; color: #0D1117; font-weight: 600; vertical-align: middle; }}
+    .ai-pill {{ background: #15803D; color: #FAF8F5; font-size: 10px; font-weight: bold; padding: 2px 7px; border-radius: 4px; vertical-align: middle; margin-left: 6px; display: inline-block; }}
+    .white-card {{ background: #ffffff; border: 1px solid #ECE6DC; border-radius: 18px; padding: 28px; margin-top: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); text-align: left; }}
+    .greeting {{ font-family: Georgia, serif; font-size: 26px; color: #0b0f10; margin: 0 0 8px 0; font-weight: normal; }}
+    .subgreeting {{ font-family: Georgia, serif; font-style: italic; font-size: 15px; color: #15803D; margin: 0 0 14px 0; font-weight: 600; }}
+    .body-text {{ font-size: 14px; line-height: 1.6; color: #434748; margin: 0 0 16px 0; }}
+    .detail-card {{ background: #F8F9FA; border-left: 4px solid #15803D; border-radius: 8px; padding: 16px; margin: 18px 0; }}
+    .detail-item {{ font-size: 13px; color: #1B1C1A; margin: 6px 0; }}
+    .detail-item strong {{ color: #000000; display: inline-block; width: 120px; }}
+    .btn {{ display: inline-block; background: #000000; color: #ffffff !important; padding: 12px 24px; border-radius: 10px; font-size: 13px; font-weight: bold; text-decoration: none; text-align: center; margin-top: 10px; }}
+    .signature-div {{ border-top: 1px solid #E7E5E4; padding-top: 16px; margin-top: 20px; }}
+    .footer {{ font-size: 11px; color: #8A857D; text-align: center; border-top: 1px solid #ECE6DC; padding-top: 16px; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-bar"></div>
+    <div class="content">
+      <div>
+        <span class="brand-title">{app_name}</span>
+        <span class="ai-pill">READY</span>
+      </div>
+
+      <div class="white-card">
+        <h1 class="greeting">Dear {first_name},</h1>
+        <p class="subgreeting">Exciting news! Your revision session is starting shortly.</p>
+        <p class="body-text">
+          This is your personal reminder from {app_name}. Your targeted study materials, grounded question paper, and diagnostic practice questions have been assembled and are primed for your review!
+        </p>
+
+        <div class="detail-card">
+          <div class="detail-item"><strong>Session Title:</strong> {session_title}</div>
+          <div class="detail-item"><strong>Scheduled Date:</strong> {scheduled_date}</div>
+          <div class="detail-item"><strong>Scheduled Time:</strong> {scheduled_time}</div>
+          <div class="detail-item"><strong>Focused Topic:</strong> {topic_name}</div>
+          <div class="detail-item"><strong>Status:</strong> Grounded & Diagnostic Active</div>
+        </div>
+
+        <p class="body-text">
+          Remember: every 15 minutes of targeted revision on what you <em>actually don't know</em> saves hours of unfocused re-reading. You've got this!
+        </p>
+
+        <div style="text-align: center; margin: 20px 0;">
+          <a href="http://127.0.0.1:5173/#dashboard" class="btn" target="_blank">Open Revision Session &rarr;</a>
+        </div>
+
+        <div class="signature-div">
+          <div style="font-family: Georgia, serif; font-style: italic; font-size: 13px; color: #78716C;">Cheering for your success,</div>
+          <div style="font-family: Georgia, serif; font-size: 14px; font-weight: 600; color: #0b0f10; margin-top: 2px;">The {app_name} Team</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        Automated study reminder for {email} &nbsp;&middot;&nbsp; &copy; 2026 {app_name}
+      </div>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    text_content = f"""Dear {first_name},
+
+Exciting news! Your revision session '{session_title}' is scheduled for {scheduled_date} at {scheduled_time}.
+
+Focused Topic: {topic_name}
+Status: Grounded & Diagnostic Active
+
+Your targeted questions and paper mapped from your uploaded materials are waiting for you in your dashboard.
+
+Open workspace: http://127.0.0.1:5173/#dashboard
+
+Cheering for your success,
+The {app_name} Team
+"""
+    return subject, html_content, text_content

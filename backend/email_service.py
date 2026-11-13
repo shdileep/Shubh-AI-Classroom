@@ -16,8 +16,10 @@ env_path = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.exists(env_path):
     load_dotenv(dotenv_path=env_path)
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "GapFinder AI <onboarding@resend.dev>")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY") or os.getenv("EMAIL_PROVIDER_API_KEY", "")
+EMAIL_PROVIDER_TEMPLATE_KEY = os.getenv("EMAIL_PROVIDER_TEMPLATE_KEY", "")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL") or os.getenv("EMAIL_FROM_ADDRESS", "GapFinder AI <onboarding@resend.dev>")
+APP_URL = os.getenv("APP_URL", "http://127.0.0.1:5173")
 RESEND_API_ENDPOINT = "https://api.resend.com/emails"
 
 logger = logging.getLogger("gapfinder.email_service")
@@ -99,7 +101,8 @@ def send_email_via_resend(
         except Exception:
             msg = err_body
         logger.error(f"Resend HTTP {http_err.code} Error delivering to {to_email}: {msg}")
-        return {"success": False, "id": None, "error": f"Resend API error: {msg}"}
+        is_sandbox_block = "testing emails to your own email address" in msg
+        return {"success": False, "id": None, "error": f"Resend API error: {msg}", "sandbox_restricted": is_sandbox_block}
     except Exception as e:
         logger.error(f"Network error sending email via Resend to {to_email}: {e}")
         return {"success": False, "id": None, "error": f"Network error: {str(e)}"}
@@ -156,4 +159,37 @@ def send_welcome_email(
         print(f"[Resend Email Service] ✉️ Real Welcome email delivered to {email} (Resend ID: {res['id']})")
     else:
         print(f"[Resend Email Service] ⚠️ Resend Welcome email delivery failure for {email}: {res['error']}")
+    return res
+
+def send_revision_reminder_email(
+    name: str,
+    email: str,
+    session_title: str,
+    scheduled_date: str,
+    scheduled_time: str,
+    topic_name: str = "Core Concepts"
+) -> Dict[str, Any]:
+    """
+    Sends the 5-minute pre-revision session reminder email via Resend.
+    """
+    from backend.email_templates import get_revision_reminder_email_content
+    subject, html_content, text_content = get_revision_reminder_email_content(
+        email=email,
+        name=name,
+        session_title=session_title,
+        scheduled_date=scheduled_date,
+        scheduled_time=scheduled_time,
+        topic_name=topic_name,
+        app_name="GapFinder AI"
+    )
+    res = send_email_via_resend(
+        to=email,
+        subject=subject,
+        html=html_content,
+        text=text_content
+    )
+    if res["success"]:
+        print(f"[Resend Email Service] ⚡ Revision reminder email delivered to {email} (Resend ID: {res['id']})")
+    else:
+        print(f"[Resend Email Service] ⚠️ Resend revision reminder notice for {email}: {res['error']}")
     return res

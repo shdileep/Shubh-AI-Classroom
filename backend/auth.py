@@ -85,6 +85,19 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
     token = credentials.credentials
     payload = decode_jwt_token(token)
     if payload and "sub" in payload:
+        # Ensure user role is always present in token payload
+        if "role" not in payload:
+            from backend.database import get_connection, IS_POSTGRES
+            conn = get_connection()
+            cur = conn.cursor()
+            try:
+                q = "SELECT role FROM users WHERE id = %s" if IS_POSTGRES else "SELECT role FROM users WHERE id = ?"
+                cur.execute(q, (payload["sub"],))
+                r = cur.fetchone()
+                payload["role"] = (r[0] if IS_POSTGRES else r["role"]) if r else "student"
+            finally:
+                cur.close()
+                conn.close()
         return payload
 
     # Check for verified Clerk token (JWT from Clerk OAuth)
@@ -107,6 +120,7 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
                             "sub": str(user_id),
                             "email": row[2] if IS_POSTGRES else row["email"],
                             "name": row[1] if IS_POSTGRES else row["name"],
+                            "role": row[3] if IS_POSTGRES else row["role"],
                             "clerk_id": clerk_sub
                         }
                 finally:
@@ -120,3 +134,12 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
         detail="Invalid or expired authentication session. Please sign in again.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+def require_teacher(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Ensures endpoint can only be accessed by authenticated instructors and teaching staff."""
+    if current_user.get("role") != "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Instructor access required. This resource is reserved for course faculty and teaching staff."
+        )
+    return current_user
