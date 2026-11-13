@@ -211,10 +211,25 @@ def get_dashboard_data(current_user: Dict[str, Any] = Depends(get_current_user))
         user_email = u[1] if IS_POSTGRES else u["email"]
         user_course = u[2] if IS_POSTGRES else u["course"]
 
-        # Fetch knowledge gaps
-        gaps_query = "SELECT id, topic, mastery_score, priority, status FROM knowledge_gaps WHERE user_id = %s ORDER BY mastery_score ASC" if IS_POSTGRES else "SELECT id, topic, mastery_score, priority, status FROM knowledge_gaps WHERE user_id = ? ORDER BY mastery_score ASC"
-        cur.execute(gaps_query, (user_id,))
-        rows = cur.fetchall()
+        # Check if student has completed any assessments
+        cur.execute("SELECT COUNT(*) FROM diagnostic_sessions WHERE user_id = %s" if IS_POSTGRES else "SELECT COUNT(*) FROM diagnostic_sessions WHERE user_id = ?", (user_id,))
+        diag_count = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT COUNT(*) FROM assignment_submissions WHERE user_id = %s" if IS_POSTGRES else "SELECT COUNT(*) FROM assignment_submissions WHERE user_id = ?", (user_id,))
+        sub_count = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT COUNT(*) FROM practice_submissions WHERE user_id = %s" if IS_POSTGRES else "SELECT COUNT(*) FROM practice_submissions WHERE user_id = ?", (user_id,))
+        prac_count = cur.fetchone()[0] or 0
+
+        has_taken_assessment = (diag_count + sub_count + prac_count) > 0
+
+        if not has_taken_assessment:
+            rows = []
+        else:
+            # Fetch knowledge gaps strictly evaluated from completed assessments
+            gaps_query = "SELECT id, topic, mastery_score, priority, status FROM knowledge_gaps WHERE user_id = %s AND status != 'Untested' ORDER BY mastery_score ASC" if IS_POSTGRES else "SELECT id, topic, mastery_score, priority, status FROM knowledge_gaps WHERE user_id = ? AND status != 'Untested' ORDER BY mastery_score ASC"
+            cur.execute(gaps_query, (user_id,))
+            rows = cur.fetchall()
         
         gaps = []
         for r in rows:

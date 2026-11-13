@@ -218,14 +218,14 @@ def get_teacher_class_overview(current_user: Dict[str, Any] = Depends(require_te
 @router.get("/students")
 def get_teacher_students_directory(current_user: Dict[str, Any] = Depends(require_teacher)):
     """
-    Returns all registered students in tabular format:
-    S.No, Name, Email, Course, Materials Count, Topics Count, Average Mastery, Actions (Eye Icon).
+    Returns all registered users in tabular format:
+    S.No, Name, Email, Role, Course, Materials Count, Topics Count, Average Mastery, Actions (Eye Icon).
     """
     require_teacher(current_user)
     conn = get_connection()
     cur = conn.cursor()
     try:
-        stud_sql = "SELECT id, name, email, course, created_at FROM users WHERE role = 'student' ORDER BY id ASC"
+        stud_sql = "SELECT id, name, email, role, course, created_at FROM users ORDER BY id ASC"
         cur.execute(stud_sql)
         rows = cur.fetchall()
 
@@ -234,8 +234,9 @@ def get_teacher_students_directory(current_user: Dict[str, Any] = Depends(requir
             sid = r[0] if IS_POSTGRES else r["id"]
             sname = r[1] if IS_POSTGRES else r["name"]
             semail = r[2] if IS_POSTGRES else r["email"]
-            scourse = r[3] if IS_POSTGRES else r["course"]
-            screated = str(r[4] if IS_POSTGRES else r["created_at"])
+            srole = r[3] if IS_POSTGRES else r["role"]
+            scourse = r[4] if IS_POSTGRES else r["course"]
+            screated = str(r[5] if IS_POSTGRES else r["created_at"])
 
             # Count materials uploaded
             cur.execute("SELECT COUNT(*) FROM documents WHERE user_id = %s" if IS_POSTGRES else "SELECT COUNT(*) FROM documents WHERE user_id = ?", (sid,))
@@ -259,6 +260,7 @@ def get_teacher_students_directory(current_user: Dict[str, Any] = Depends(requir
                 "id": sid,
                 "name": sname,
                 "email": semail,
+                "role": srole,
                 "course": scourse,
                 "materials_count": doc_cnt,
                 "topics_count": top_cnt,
@@ -500,10 +502,10 @@ def get_weaker_students_list(current_user: Dict[str, Any] = Depends(require_teac
 @router.post("/assignments/create")
 def create_teacher_assignment(
     file: UploadFile = File(...),
-    title: str = Form(...),
-    topic: str = Form(...),
-    start_time: str = Form(...),
-    end_time: str = Form(...),
+    title: Optional[str] = Form(""),
+    topic: Optional[str] = Form(""),
+    start_time: Optional[str] = Form(""),
+    end_time: Optional[str] = Form(""),
     faculty_name: Optional[str] = Form("Faculty Administrator"),
     subject: Optional[str] = Form("Core Curriculum"),
     assignment_type: str = Form("quiz"), # 'quiz' (30 MCQs, 30 min) or 'question_paper' (10 questions, 45 min)
@@ -517,7 +519,17 @@ def create_teacher_assignment(
     Enforces scheduled attempt window (start_time to end_time).
     """
     require_teacher(current_user)
-    teacher_id = current_user.get("sub", 1)
+    raw_tid = current_user.get("sub", 1)
+    try:
+        teacher_id = int(raw_tid)
+    except (ValueError, TypeError):
+        conn_t = get_connection()
+        cur_t = conn_t.cursor()
+        cur_t.execute("SELECT id FROM users WHERE clerk_id = %s OR email = %s" if IS_POSTGRES else "SELECT id FROM users WHERE clerk_id = ? OR email = ?", (str(raw_tid), current_user.get("email")))
+        u_row = cur_t.fetchone()
+        teacher_id = (u_row[0] if IS_POSTGRES else u_row["id"]) if u_row else 1
+        cur_t.close()
+        conn_t.close()
 
     filename = file.filename or "assignment_source_doc"
     ext = os.path.splitext(filename)[1].lower()
@@ -532,8 +544,19 @@ def create_teacher_assignment(
 
     # 1. Extract text from uploaded document
     extracted_pages = document_processor.extract_text_from_file(file_path, filename)
+    doc_base_name = os.path.splitext(filename)[0].replace("_", " ").title()
+
+    eff_title = (title or "").strip() or f"{doc_base_name} Comprehensive Assessment"
+    eff_topic = (topic or "").strip() or doc_base_name
+    eff_faculty = (faculty_name or "").strip() or current_user.get("name") or "Faculty Administrator"
+    eff_subject = (subject or "").strip() or "Core Curriculum"
+
+    now = datetime.datetime.now()
+    eff_start = (start_time or "").strip() or (now - datetime.timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M")
+    eff_end = (end_time or "").strip() or (now + datetime.timedelta(days=14)).strftime("%Y-%m-%dT%H:%M")
+
     if not extracted_pages:
-        extracted_pages = [{"page_number": 1, "raw_text": f"Grounded syllabus material for {topic}", "word_count": 10, "is_scanned": False}]
+        extracted_pages = [{"page_number": 1, "raw_text": f"Grounded syllabus material for {eff_topic}", "word_count": 10, "is_scanned": False}]
 
     norm_type = "question_paper" if assignment_type.lower() in ["question_paper", "questionpaper", "paper"] else "quiz"
     duration = 45 if norm_type == "question_paper" else 30
@@ -542,7 +565,7 @@ def create_teacher_assignment(
     # 2. Generate grounded questions
     questions = generate_assignment_questions_from_document(
         extracted_pages=extracted_pages,
-        topic=topic.strip(),
+        topic=eff_topic,
         assignment_type=norm_type,
         document_title=filename
     )
@@ -570,16 +593,15 @@ def create_teacher_assignment(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         """
         cur.execute(ins_sql, (
-            teacher_id, title.strip(), topic.strip(), subject.strip(),
-            faculty_name.strip() if faculty_name else "Faculty Administrator",
-            norm_type, filename, start_time.strip(), end_time.strip(),
+            teacher_id, eff_title, eff_topic, eff_subject,
+            eff_faculty, norm_type, filename, eff_start, eff_end,
             duration, questions_json_str, len(questions)
         ))
         assignment_id = cur.fetchone()[0] if IS_POSTGRES else cur.lastrowid
 
         # Record in admin history
-        act_title = f"{'Quiz' if norm_type == 'quiz' else 'Question Paper'} Published: {title.strip()}"
-        act_details = f"Topic: {topic.strip()} · {len(questions)} grounded questions ready · Window: {start_time} to {end_time} ({duration} mins limit) · Source: {filename}"
+        act_title = f"{'Quiz' if norm_type == 'quiz' else 'Question Paper'} Published: {eff_title}"
+        act_details = f"Topic: {eff_topic} · {len(questions)} grounded questions ready · Window: {eff_start} to {eff_end} ({duration} mins limit) · Source: {filename}"
         hist_sql = """
             INSERT INTO admin_history (admin_id, action_type, title, details)
             VALUES (%s, %s, %s, %s)
@@ -595,16 +617,17 @@ def create_teacher_assignment(
         conn.commit()
 
         return {
-            "message": f"Assignment '{title}' published successfully to all students!",
+            "message": f"Assignment '{eff_title}' published successfully to all students!",
             "assignment_id": assignment_id,
-            "title": title.strip(),
-            "topic": topic.strip(),
+            "title": eff_title,
+            "topic": eff_topic,
             "assignment_type": norm_type,
             "total_questions": len(questions),
             "duration_minutes": duration,
-            "start_time": start_time,
-            "end_time": end_time,
-            "document_title": filename
+            "start_time": eff_start,
+            "end_time": eff_end,
+            "document_title": filename,
+            "questions": questions
         }
     finally:
         cur.close()
@@ -613,14 +636,14 @@ def create_teacher_assignment(
 
 @router.get("/assignments")
 def list_teacher_assignments(current_user: Dict[str, Any] = Depends(require_teacher)):
-    """List all assignments created by teachers with submission statistics."""
+    """List all assignments created by teachers with questions and submission statistics."""
     require_teacher(current_user)
     conn = get_connection()
     cur = conn.cursor()
     try:
         sql = """
             SELECT id, title, topic, subject, faculty_name, assignment_type,
-                   document_title, start_time, end_time, duration_minutes, total_questions, status, created_at
+                   document_title, start_time, end_time, duration_minutes, questions_json, total_questions, status, created_at
             FROM teacher_assignments
             ORDER BY created_at DESC
         """
@@ -636,6 +659,12 @@ def list_teacher_assignments(current_user: Dict[str, Any] = Depends(require_teac
             sub_cnt = sub_res[0] or 0
             avg_score = round(sub_res[1], 1) if sub_res[1] is not None else 0
 
+            raw_q = r[10] if IS_POSTGRES else r["questions_json"]
+            try:
+                parsed_qs = json.loads(raw_q) if raw_q else []
+            except Exception:
+                parsed_qs = []
+
             assignments.append({
                 "id": aid,
                 "title": r[1] if IS_POSTGRES else r["title"],
@@ -647,14 +676,72 @@ def list_teacher_assignments(current_user: Dict[str, Any] = Depends(require_teac
                 "start_time": r[7] if IS_POSTGRES else r["start_time"],
                 "end_time": r[8] if IS_POSTGRES else r["end_time"],
                 "duration_minutes": r[9] if IS_POSTGRES else r["duration_minutes"],
-                "total_questions": r[10] if IS_POSTGRES else r["total_questions"],
-                "status": r[11] if IS_POSTGRES else r["status"],
-                "created_at": str(r[12] if IS_POSTGRES else r["created_at"]),
+                "total_questions": r[11] if IS_POSTGRES else r["total_questions"],
+                "status": r[12] if IS_POSTGRES else r["status"],
+                "created_at": str(r[13] if IS_POSTGRES else r["created_at"]),
                 "submissions_count": sub_cnt,
-                "average_score": avg_score
+                "average_score": avg_score,
+                "questions": parsed_qs
             })
 
         return {"assignments": assignments, "total": len(assignments)}
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.get("/assignments/{assignment_id}/answer-key")
+def get_assignment_answer_key(assignment_id: int, current_user: Dict[str, Any] = Depends(require_teacher)):
+    """Fetch complete question paper or quiz with answers for faculty eye icon inspection."""
+    require_teacher(current_user)
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        sql = """
+            SELECT id, title, topic, subject, faculty_name, assignment_type,
+                   document_title, start_time, end_time, duration_minutes, questions_json, total_questions, created_at
+            FROM teacher_assignments
+            WHERE id = %s
+        """ if IS_POSTGRES else """
+            SELECT id, title, topic, subject, faculty_name, assignment_type,
+                   document_title, start_time, end_time, duration_minutes, questions_json, total_questions, created_at
+            FROM teacher_assignments
+            WHERE id = ?
+        """
+        cur.execute(sql, (assignment_id,))
+        r = cur.fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Assignment not found.")
+
+        raw_q = r[10] if IS_POSTGRES else r["questions_json"]
+        try:
+            questions = json.loads(raw_q) if raw_q else []
+            # Ensure correct_answer is always populated for options
+            for q in questions:
+                if isinstance(q, dict) and "options" in q and isinstance(q["options"], list):
+                    c_idx = q.get("correct_index", 0)
+                    if 0 <= c_idx < len(q["options"]):
+                        letter = chr(65 + c_idx)
+                        if not q.get("correct_answer"):
+                            q["correct_answer"] = f"{letter}. {q['options'][c_idx]}"
+        except Exception:
+            questions = []
+
+        return {
+            "id": r[0] if IS_POSTGRES else r["id"],
+            "title": r[1] if IS_POSTGRES else r["title"],
+            "topic": r[2] if IS_POSTGRES else r["topic"],
+            "subject": r[3] if IS_POSTGRES else r["subject"],
+            "faculty_name": r[4] if IS_POSTGRES else r["faculty_name"],
+            "assignment_type": r[5] if IS_POSTGRES else r["assignment_type"],
+            "document_title": r[6] if IS_POSTGRES else r["document_title"],
+            "start_time": r[7] if IS_POSTGRES else r["start_time"],
+            "end_time": r[8] if IS_POSTGRES else r["end_time"],
+            "duration_minutes": r[9] if IS_POSTGRES else r["duration_minutes"],
+            "total_questions": r[11] if IS_POSTGRES else r["total_questions"],
+            "created_at": str(r[12] if IS_POSTGRES else r["created_at"]),
+            "questions": questions
+        }
     finally:
         cur.close()
         conn.close()

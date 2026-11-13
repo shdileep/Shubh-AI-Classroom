@@ -87,34 +87,19 @@ class RevisionPlannerEngine:
             })
             day_counter += 1
 
-        # If no gaps are yet recorded, supply a structured baseline diagnostic revision plan
+        # If no real evaluated gaps exist, do NOT supply fake curriculum days.
+        # Revision must be strictly grounded in actual completed quizzes and question papers.
         if len(tasks) == 0:
-            baseline_curriculum = [
-                {"topic": "Linear Systems & Matrix Transformations", "unit": "Unit 1: Linear Transformations", "obj": "Review matrix representation, row operations, and kernel foundations.", "mins": 35, "q": 5},
-                {"topic": "Vector Subspaces & Linear Independence", "unit": "Unit 1: Vector Spaces", "obj": "Verify span, basis dimension, and subspace closure criteria.", "mins": 35, "q": 5},
-                {"topic": "Matrix Determinants & Characteristic Polynomials", "unit": "Unit 3: Bilinear Forms", "obj": "Compute eigenvalues and solve det(A - λI) = 0 for algebraic multiplicity.", "mins": 40, "q": 5},
-                {"topic": "Orthogonal Projections & Gram-Schmidt", "unit": "Unit 4: Inner Products", "obj": "Master projection operators and orthogonal complement decompositions.", "mins": 35, "q": 4},
-                {"topic": "Curriculum Diagnostic Practice Exam", "unit": "Unit 5: Synthesis", "obj": "Attempt 10-Question formal assessment to identify critical knowledge gaps.", "mins": 45, "q": 10}
-            ]
-            for idx, item in enumerate(baseline_curriculum, start=1):
-                tasks.append({
-                    "id": f"task-baseline-{idx}",
-                    "day": f"Day {idx}",
-                    "day_number": idx,
-                    "topic": item["topic"],
-                    "subject": "Linear Algebra & STEM Core",
-                    "unit": item["unit"],
-                    "priority": "High" if idx == 1 or idx == 5 else "Medium",
-                    "estimated_duration_minutes": item["mins"],
-                    "revision_objective": item["obj"],
-                    "recommended_source_section": "Course Outline §1.1 · Verified Syllabus",
-                    "practice_question_count": item["q"],
-                    "completed": False,
-                    "completed_at": None,
-                    "drill": None,
-                    "blocked_prerequisites": []
-                })
-            day_counter = 6
+            return {
+                "title": "Evidence-Grounded Revision Plan",
+                "target_exam_date": target_exam_date or (datetime.date.today() + datetime.timedelta(days=14)).isoformat(),
+                "daily_available_hours": daily_available_hours,
+                "total_days": 0,
+                "completed_tasks_count": 0,
+                "remaining_tasks_count": 0,
+                "tasks": [],
+                "adaptation_reason": "No active revision tasks. Complete a quiz or question paper to generate your evidence-grounded revision plan based on questions you missed."
+            }
 
         # Calculate estimated completion
         total_days = max(day_counter - 1, 1)

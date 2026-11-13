@@ -16,10 +16,22 @@ def get_revision_plan(current_user: Dict[str, Any] = Depends(get_current_user)):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        # Fetch current gaps
-        gaps_sql = "SELECT topic, mastery_score, priority, status FROM knowledge_gaps WHERE user_id = %s ORDER BY mastery_score ASC" if IS_POSTGRES else "SELECT topic, mastery_score, priority, status FROM knowledge_gaps WHERE user_id = ? ORDER BY mastery_score ASC"
-        cur.execute(gaps_sql, (user_id,))
-        rows = cur.fetchall()
+        # Check if student has taken any assessments
+        cur.execute("SELECT COUNT(*) FROM diagnostic_sessions WHERE user_id = %s" if IS_POSTGRES else "SELECT COUNT(*) FROM diagnostic_sessions WHERE user_id = ?", (user_id,))
+        diag_count = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT COUNT(*) FROM assignment_submissions WHERE user_id = %s" if IS_POSTGRES else "SELECT COUNT(*) FROM assignment_submissions WHERE user_id = ?", (user_id,))
+        sub_count = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT COUNT(*) FROM practice_submissions WHERE user_id = %s" if IS_POSTGRES else "SELECT COUNT(*) FROM practice_submissions WHERE user_id = ?", (user_id,))
+        prac_count = cur.fetchone()[0] or 0
+
+        if (diag_count + sub_count + prac_count) == 0:
+            rows = []
+        else:
+            gaps_sql = "SELECT topic, mastery_score, priority, status FROM knowledge_gaps WHERE user_id = %s AND status != 'Untested' ORDER BY mastery_score ASC" if IS_POSTGRES else "SELECT topic, mastery_score, priority, status FROM knowledge_gaps WHERE user_id = ? AND status != 'Untested' ORDER BY mastery_score ASC"
+            cur.execute(gaps_sql, (user_id,))
+            rows = cur.fetchall()
 
         gaps = []
         for r in rows:

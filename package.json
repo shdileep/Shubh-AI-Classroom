@@ -1,0 +1,21 @@
+{
+  "name": "shubh-ai-classroom",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shubh AI Classroom (GapFinder AI) - Intelligent Diagnostic LMS & Remediation Platform",
+  "scripts": {
+    "build": "cd gapfinder-app && npm install && npm run build",
+    "dev": "cd gapfinder-app && npm run dev",
+    "start": "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+  },
+  "keywords": [
+    "lms",
+    "ai",
+    "diagnostic-learning",
+    "react",
+    "fastapi",
+    "vercel"
+  ],
+  "author": "Acadza AI",
+  "license": "MIT"
+}

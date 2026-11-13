@@ -1,126 +1,256 @@
-# GapFinder AI — Production-Grade AI Diagnostic LMS Platform
+# Shubh AI Classroom (GapFinder AI)
+### Production-Grade AI Diagnostic LMS & Grounded Curriculum Remediation Platform
 
-> **Find what students don't know, identify why they don't know it, and build an adaptive, personalized learning plan to close those gaps.**
+[![Vercel Deployment](https://img.shields.io/badge/Deploy-Vercel-black?style=flat&logo=vercel)](https://vercel.com)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![React 19](https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=flat&logo=react)](https://react.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Styles-Tailwind%20CSS-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-GapFinder AI is a modern, production-oriented EdTech SaaS Learning Management System (LMS) designed from the ground up for diagnostic learning. It is **not** a generic course catalogue, basic quiz builder, or simple chatbot wrapper. Every assessment, knowledge gap diagnosis, and revision task is mathematically modeled, grounded in course materials via Retrieval-Augmented Generation (RAG), and integrated with real AI and email delivery services.
+> **"Find what students don't know, identify why they don't know it, and build an adaptive, personalized learning plan to close those gaps."**
 
----
-
-## 1. Core Architectural Pillars
-
-### A. The 7-Step Diagnostic Learning Loop
-1. **Study Material Ingestion:** High-fidelity multi-format document extraction (PDF, DOCX, TXT, Markdown) with PyMuPDF (`fitz`), page-by-page metadata, and semantic chunking.
-2. **Syllabus & Topic Hierarchy:** 6-layer structured curriculum tree (Subject → Unit → Topic → Subtopic → Concept → Question) with exam weightings and past-paper frequency ratings.
-3. **Retrieval-Grounded Diagnostic Assessments:** Timed, multi-modal diagnostic exams (MCQ and short-answer) strictly grounded in source material chunks with page and section citations. Correct answer keys are securely kept on the backend during test taking.
-4. **Evidence-Based Knowledge Gap Detection:** Bayesian-weighted topic mastery scoring (<50% Weak/Critical Gap, 50–79% Medium/Needs Review, ≥80% Strong/Mastered), root cause analysis, misconception explanations, and blocked prerequisite tracking.
-5. **Personalized Revision Planner:** Dynamic priority-queue scheduler that prioritizes blocked foundational prerequisites before advanced topics, tuned to target exam dates and student availability.
-6. **Adaptive Re-Assessment & Micro-Drills:** Targeted practice questions on weak topics that dynamically update mastery scores in the database upon submission.
-7. **Measurable Telemetry & Growth Analytics:** Longitudinal knowledge growth tracking, weak-topic resolution velocity, cohort failure rates, and study time distribution.
-
-### B. Clerk Authentication & Resend Email Delivery
-- **Authoritative Identity:** Clerk manages Google OAuth, sessions, user lifecycle, and token verification.
-- **Transactional Email Infrastructure:** Resend powers welcome emails, transactional notices, and OTP deliveries.
-- **Strict Idempotency:** Webhook handlers (`/api/webhooks/clerk`) verify Svix cryptographic signatures and ensure welcome emails are dispatched strictly once per new account across retries.
-- **Cryptographic Security:** Verification OTPs use 6-digit cryptographically random numbers hashed with salted SHA-256 HMAC. Single-use enforcement, 5-minute expiration, 5-attempt lockout, and 60-second resend cooldowns are enforced.
-
-### C. Multi-Provider AI Orchestrator
-- **Active Provider:** Groq (`qwen/qwen3.8-27b`) delivering ~3.3-second low-latency inference for Socratic reasoning and gap diagnosis.
-- **Fallback Architecture:** Support for Anthropic Claude, OpenAI, and Hugging Face with automatic graceful degradation.
+Shubh AI Classroom (GapFinder AI) is an intelligent, full-stack Learning Management System (LMS) built for evidence-based diagnostic learning, syllabus grounding, and targeted remediation. Unlike generic quiz apps or simple chatbot wrappers, every assessment, knowledge gap diagnosis, and revision task in GapFinder is mathematically modeled, strictly grounded in uploaded course materials, and integrated with transactional notification infrastructure.
 
 ---
 
-## 2. Technology Stack
-
-- **Frontend:** React 19, Vite, Tailwind CSS, Lucide React, Inter typography.
-- **Backend:** FastAPI, Python 3.12, Pydantic v2, PyMuPDF (`fitz`), Python-Multipart, Uvicorn.
-- **Database:** Dual-engine architecture (PostgreSQL via `psycopg2` in production with zero-config embedded SQLite `backend/gapfinder.db` fallback).
-- **Authentication:** Clerk SDK + JWT (`python-jose`).
-- **Email Delivery:** Resend REST API & SDK.
-- **AI/LLM:** Groq API (`qwen/qwen3.8-27b`).
+## 📑 Table of Contents
+- [1. Key Features & Capabilities](#1-key-features--capabilities)
+- [2. System Architecture](#2-system-architecture)
+- [3. Technology Stack](#3-technology-stack)
+- [4. Project Structure](#4-project-structure)
+- [5. Vercel Deployment Guide](#5-vercel-deployment-guide)
+- [6. Local Development Setup](#6-local-development-setup)
+- [7. Verification Test Suites](#7-verification-test-suites)
+- [8. Demo Accounts for Evaluation](#8-demo-accounts-for-evaluation)
 
 ---
 
-## 3. Project Directory Structure
+## 1. Key Features & Capabilities
+
+### 🎓 1. Retrieval-Grounded Diagnostic Assessments
+- **100-Mark Analytical Question Papers**: 10 analytical questions (10 marks each) with citation-backed questions, LaTeX math support, and automated evaluation rubrics.
+- **Adaptive 30-MCQ Quizzes**: Auto-graded instantaneously against calibrated answer keys.
+- **Single Top-Right Submission Flow**: Clear, unified examination header with auto-save and submission safeguards.
+- **Strict Anti-Cheating Environment**: Fullscreen enforcement, tab-switch telemetry, and copy-paste prevention during testing.
+
+### 🔍 2. Evidence-Grounded Knowledge Gap Detection
+- **No False Gaps**: Unattempted syllabus topics are **never** marked as critical deficits (0% mastery is strictly reserved for failed attempts).
+- **Bayesian Mastery Scoring**: Classifies student mastery (<50% Weak / Critical Gap, 50–79% Medium / Needs Review, ≥80% Strong / Mastered).
+- **Tabular Gap Report**:
+  - Structured columns: `S.No`, `Topic`, `Date`, `Percent`, `Action` (Eye icon 👁️).
+  - Floating Detail Modal: Inspect individual questions, student's submitted answers, calibrated correct answers, and syllabus citations.
+
+### 🗺️ 3. Curriculum Topic Map & Animated Flowchart Generator
+- **Document-Grounded Hierarchy**: Structured topics and subtopic badges extracted directly from the uploaded course syllabus or textbook.
+- **Animated Flowchart Synthesis**:
+  - Clicking **"Generate Flowchart"** displays a blurred-background overlay with a clean white stage counting from **1% to 100%**.
+  - Once compilation finishes, an interactive decision tree / concept flowchart is rendered using Mermaid syntax with an easy close button.
+
+### 📝 4. Academic Notes in Authentic PDF Presentation Format
+- **Simulated A4 Paper Layout**: Clean academic document with page numbers (`Page X of Y`), institutional headers, justified paragraphs (`text-justify font-serif`), and structured bullet points with emerald indicators.
+- **Clean Text Sanitization**: Automatic removal of raw markdown artifacts (`##`, `###`, `**`, `*`, or OCR tags) for publication-ready notes.
+- **Concept Architecture Diagram Generator**: Synthesizes and embeds an interactive concept flowchart directly into the study note.
+- **Print / Export PDF**: 1-click native PDF export via `window.print()`.
+
+### ⏱️ 5. Personalized Timed Revision Planner
+- **Targeted Remediation Queue**: Prioritizes foundational prerequisites diagnosed from actual assessment attempts before advancing to complex coursework.
+- **Session-Specific Document Attachments**: The scheduling modal includes a dedicated dropzone to attach fresh PDF/DOCX/TXT materials for that specific study slot.
+- **Pre-Session Notifications**: 5-minute pre-session briefing emails dispatched automatically via Resend.
+
+### 👩‍🏫 6. Faculty & Teacher Dashboard
+- **Instant Assignment Publishing**: Upload any course document to generate and broadcast 30-MCQ quizzes or 100-mark analytical papers directly to all enrolled students.
+- **Published Assignments Table**:
+  - Columns: `S.No`, `Objective` (Quiz vs Question Paper), `Topic Name`, `Date`, `Answer Key` (Eye icon 👁️).
+  - Floating Answer Key Modal: Complete question paper review with **green-labeled correct options** (A, B, C, D) and model solution rubrics.
+- **Complete Cohort Directory**: Lists all registered students, their uploaded materials, topics studied, and average mastery.
+- **Student Attempt Telemetry**: Sort attempts by Highest % to Lowest % or Lowest % to Highest %.
+
+### 🤖 7. Domain-Specific Shubh AI Assistant
+- **Student Mode**: Socratic study tutor providing grounded concept explanations, step-by-step math breakdowns, and concept diagrams.
+- **Faculty / Admin Mode (Faculty Co-Pilot)**: Tailored for instructors with quick tools for:
+  - 📊 Analyzing cohort weak topics and failure rates
+  - 📝 Drafting 10–30 grounded exam questions
+  - 🎯 Recommending remediation drills for students scoring <50%
+  - ⚡ Calibrating question rubrics and answer keys
+
+---
+
+## 2. System Architecture
 
 ```
-Acadza_AI_Intern_Assignment/
+                                  ┌─────────────────────────────┐
+                                  │      Client (Browser)       │
+                                  │   React 19 + Tailwind v4    │
+                                  └──────────────┬──────────────┘
+                                                 │
+                                     REST APIs / JSON / JWT
+                                                 │
+                                  ┌──────────────▼──────────────┐
+                                  │       Vercel Edge /         │
+                                  │     FastAPI Serverless      │
+                                  │        (api/index.py)       │
+                                  └──────────────┬──────────────┘
+                                                 │
+               ┌─────────────────────────────────┼────────────────────────────────┐
+               │                                 │                                │
+    ┌──────────▼──────────┐           ┌──────────▼──────────┐          ┌──────────▼──────────┐
+    │  Document Engine    │           │  Diagnostic Engine  │          │  AI Orchestrator    │
+    │  PyMuPDF (fitz)     │           │  Bayesian Scoring   │          │  Groq / Anthropic   │
+    │  Chunking & BM25    │           │  Gap Detection      │          │  OpenAI Fallbacks   │
+    └──────────┬──────────┘           └──────────┬──────────┘          └──────────┬──────────┘
+               │                                 │                                │
+               └─────────────────────────────────┼────────────────────────────────┘
+                                                 │
+                                  ┌──────────────▼──────────────┐
+                                  │      Database Engine        │
+                                  │   PostgreSQL / SQLite       │
+                                  │   (Dual-Mode Architecture)  │
+                                  └─────────────────────────────┘
+```
+
+---
+
+## 3. Technology Stack
+
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 19, Vite, Tailwind CSS v4, Lucide React, Mermaid Flowcharts |
+| **Backend** | FastAPI, Python 3.12, Pydantic v2, PyMuPDF (`fitz`), Python-Multipart, Uvicorn |
+| **Database** | PostgreSQL (Production) / Zero-config SQLite `backend/gapfinder.db` (Fallback) |
+| **Authentication** | Clerk Authentication SDK, JWT (`pyjwt`), Salted SHA-256 HMAC OTPs |
+| **Email Delivery** | Resend REST API & SDK (Pre-session alerts, welcome emails, password resets) |
+| **AI Providers** | Groq API (`qwen/qwen3.8-27b`), Anthropic Claude, OpenAI with graceful fallback |
+| **Hosting** | Vercel (Frontend & Serverless Python API) |
+
+---
+
+## 4. Project Structure
+
+```
+.
+├── api/
+│   └── index.py                    # Vercel Serverless Function entrypoint (FastAPI)
 ├── backend/
-│   ├── main.py                     # FastAPI application entrypoint, CORS, routers mount
-│   ├── database.py                 # PostgreSQL & SQLite dual-mode schema migrations & seeding
-│   ├── auth.py                     # JWT token creation & dependency helpers
-│   ├── email_service.py            # Resend email dispatcher with dynamic recipient delivery
-│   ├── email_templates.py          # Responsive Stitch-branded HTML email templates
+│   ├── main.py                     # FastAPI core application & router registry
+│   ├── database.py                 # PostgreSQL & SQLite dual-mode migrations
+│   ├── auth.py                     # JWT token management & role-based access control
+│   ├── email_service.py            # Resend email dispatcher
+│   ├── email_templates.py          # Responsive HTML email templates
 │   ├── routers/
-│   │   ├── auth.py                 # Clerk sync, OTP send/verify, signup/login, webhooks
-│   │   ├── dashboard.py            # Aggregated student metrics, syllabus, diagnostic questions
-│   │   ├── documents.py            # PyMuPDF document upload, extraction, chunk preview
-│   │   ├── topics.py               # 6-layer curriculum hierarchy map & unit progress
-│   │   ├── assessments.py          # Diagnostic test generation, rubric evaluation, gap updates
-│   │   ├── gaps.py                 # Knowledge Gap Report (root cause, misconceptions, prerequisites)
-│   │   ├── revision.py             # Personalized revision plan, task toggles, regeneration
-│   │   ├── practice.py             # Adaptive topic micro-drills & mastery boosters
-│   │   ├── analytics.py            # Telemetry, topic mastery bars, score growth trends
-│   │   ├── history.py              # Longitudinal student activity stream
-│   │   ├── assistant.py            # Socratic AI study tutor grounded in RAG chunks
-│   │   └── personal.py             # Bookmarks, notes, and learning preferences
+│   │   ├── assistant.py            # Domain-specific Shubh AI (Student tutor / Faculty Co-Pilot)
+│   │   ├── dashboard.py            # Student dashboard metrics & diagnostic telemetry
+│   │   ├── documents.py            # Document ingestion, PyMuPDF extraction & chunking
+│   │   ├── gaps.py                 # Tabular Knowledge Gap Report & answer key details
+│   │   ├── revision.py             # Grounded revision planner & scheduled sessions
+│   │   ├── student_assignments.py  # Student assignment attempts & instant grading
+│   │   ├── teacher.py              # Faculty dashboard, cohort directory & answer keys
+│   │   ├── topics.py               # Curriculum hierarchy map & subtopics
+│   │   └── ...
 │   ├── services/
 │   │   ├── ai_provider.py          # Multi-provider LLM orchestrator (Groq / Anthropic / OpenAI)
-│   │   ├── document_processor.py   # Document parsing and chunking
-│   │   ├── rag_engine.py           # In-memory BM25 semantic retrieval engine
-│   │   ├── gap_analyzer.py         # Bayesian topic mastery & gap diagnosis engine
+│   │   ├── assignment_generator.py # 30-MCQ & 100-mark question paper generator
+│   │   ├── document_processor.py   # Multi-format document parser (PDF, DOCX, TXT)
+│   │   ├── gap_analyzer.py         # Bayesian topic mastery & gap detector
 │   │   └── revision_engine.py      # Priority-queue revision scheduler
-│   └── test_api_client.py          # In-process TestClient suite for all 12 REST endpoints
-├── gapfinder-app/                  # React + Vite frontend application
+│   └── gapfinder.db                # Embedded SQLite database (development & fallback)
+├── gapfinder-app/                  # React 19 + Vite frontend application
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── LmsDashboard.jsx    # Complete 12-tab LMS student workspace
-│   │   │   ├── SignInSignUp.jsx    # Clerk Google OAuth, OTP boxes, password reset
-│   │   │   ├── LandingPage.jsx     # Premium EdTech hero, features, and curriculum preview
-│   │   │   └── WelcomeDileepCard.jsx # First-login welcome modal
-│   │   ├── App.jsx                 # Routing shell and Clerk authentication state sync
-│   │   └── main.jsx                # ClerkProvider root
-│   └── package.json
-├── test_e2e_lms.py                 # 8-step LMS workflow verification suite
-├── test_clerk_and_email.py         # 19-step Clerk Auth & Resend Email test suite
+│   │   │   ├── LmsDashboard.jsx    # Complete LMS workspace (Overview, Gaps, Notes, Topics, etc.)
+│   │   │   ├── FlowchartViewer.jsx # Interactive Mermaid concept decision tree renderer
+│   │   │   ├── FloatingAssistantDrawer.jsx # Shubh AI Floating Co-Pilot drawer
+│   │   │   ├── LandingPage.jsx     # Institutional landing page & course preview
+│   │   │   └── SignInSignUp.jsx    # Authentication modal & credentials login
+│   │   ├── App.jsx                 # Route shell & state synchronization
+│   │   └── main.jsx                # Application root
+│   ├── package.json
+│   └── vite.config.js
+├── vercel.json                     # Vercel deployment & serverless routing config
+├── requirements.txt                # Production Python dependencies for Vercel
+├── package.json                    # Root build orchestration script
 └── README.md
 ```
 
 ---
 
-## 4. Setup and Installation
+## 5. Vercel Deployment Guide
+
+Deploying Shubh AI Classroom on Vercel is seamless thanks to `vercel.json` and the serverless Python handler `api/index.py`.
+
+### Step 1: Push Repository to GitHub
+Ensure all code is committed and pushed to your GitHub repository:
+```bash
+git add .
+git commit -m "Deploy Shubh AI Classroom to Vercel"
+git push origin main
+```
+
+### Step 2: Import into Vercel
+1. Log in to [Vercel Dashboard](https://vercel.com).
+2. Click **Add New Project** and select your GitHub repository (`Shubh-AI-Classroom`).
+3. Leave **Root Directory** as `./` (or default).
+4. Vercel automatically detects the build command from `vercel.json`:
+   - **Build Command:** `cd gapfinder-app && npm install && npm run build`
+   - **Output Directory:** `gapfinder-app/dist`
+
+### Step 3: Configure Environment Variables
+In your Vercel Project Settings under **Environment Variables**, add the following configuration:
+
+| Variable Name | Description | Example / Placeholder |
+|---|---|---|
+| `USE_SQLITE` | Set to `1` to use embedded SQLite on Vercel | `1` |
+| `JWT_SECRET` | Secret key for signing session JWT tokens | `your_super_secret_jwt_key_here` |
+| `CLERK_PUBLISHABLE_KEY` | Clerk Public API Key for authentication | `pk_test_your_clerk_publishable_key` |
+| `CLERK_SECRET_KEY` | Clerk Private Secret Key | `sk_test_your_clerk_secret_key` |
+| `RESEND_API_KEY` | Resend API Key for email notifications | `re_your_resend_api_key_here` |
+| `RESEND_FROM_EMAIL` | Sender address for notifications | `GapFinder AI <onboarding@resend.dev>` |
+| `GROQ_API_KEY` | Groq API Key for fast LLM inference | `gsk_your_groq_api_key_here` |
+| `ANTHROPIC_API_KEY` | *(Optional)* Anthropic Claude fallback key | `sk-ant-your_anthropic_api_key` |
+| `OPENAI_API_KEY` | *(Optional)* OpenAI fallback key | `sk-proj-your_openai_api_key` |
+| `DATABASE_URL` | *(Optional)* PostgreSQL connection string | `postgresql://user:pass@host:5432/dbname` |
+
+### Step 4: Deploy
+Click **Deploy**. Vercel will build the React 19 frontend and mount the FastAPI serverless backend under `/api/*`.
+
+---
+
+## 6. Local Development Setup
 
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+ and npm
-- Valid API keys (Clerk, Resend, Groq)
+- Git
 
 ### Backend Setup
-1. Navigate to the backend directory and copy the environment template:
+1. Clone the repository and navigate to project root:
+   ```bash
+   git clone https://github.com/shdileep/Shubh-AI-Classroom.git
+   cd Shubh-AI-Classroom
+   ```
+2. Create and activate a Python virtual environment:
+   ```bash
+   python -m venv .venv
+   # Windows:
+   .venv\Scripts\activate
+   # macOS/Linux:
+   source .venv/bin/activate
+   ```
+3. Install Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Copy the environment template:
    ```bash
    cp backend/.env.example backend/.env
    ```
-2. Ensure your `.env` contains:
-   ```ini
-   PORT=8000
-   JWT_SECRET=your_secret_jwt_key
-   CLERK_PUBLISHABLE_KEY=pk_test_...
-   CLERK_SECRET_KEY=sk_test_...
-   CLERK_WEBHOOK_SECRET=whsec_...
-   RESEND_API_KEY=re_...
-   RESEND_FROM_EMAIL=GapFinder AI <onboarding@resend.dev>
-   GROQ_API_KEY=gsk_...
-   ```
-3. Install dependencies:
-   ```bash
-   pip install fastapi uvicorn pydantic python-jose pymupdf groq requests python-multipart
-   ```
-4. Start the backend:
+5. Start the FastAPI backend server:
    ```bash
    python -m uvicorn backend.main:app --port 8000 --reload
    ```
+   *The backend will be available at `http://127.0.0.1:8000` (Docs at `http://127.0.0.1:8000/docs`).*
 
 ### Frontend Setup
-1. Navigate to `gapfinder-app`:
+1. Open a new terminal and navigate to `gapfinder-app`:
    ```bash
    cd gapfinder-app
    npm install
@@ -133,37 +263,63 @@ Acadza_AI_Intern_Assignment/
 
 ---
 
-## 5. Verification Test Suites
+## 7. Verification Test Suites
 
-GapFinder AI comes with three end-to-end verification suites covering 100% of functional requirements:
+GapFinder includes comprehensive automated test suites covering 100% of functional requirements:
 
-### 1. In-Process FastAPI REST Client Test (`backend/test_api_client.py`)
-Tests all 12 core REST API endpoints:
+### 1. Teacher Dashboard & Assignment Lifecycle Suite
+Tests teacher login, overview metrics, student registry, assignment creation, student submissions, and answer key retrieval:
 ```bash
-python backend/test_api_client.py
+python test_teacher_full_suite.py
 ```
-*Output: 12/12 endpoints verified operational (Health, Auth, Dashboard, Topics, Gaps, Revision, Assessments, Analytics, History, AI Tutor, Bookmarks, Notes).*
+*Expected Output: `ALL 12 TEACHER & STUDENT ASSIGNMENT SUITE TESTS PASSED 100%!`*
 
-### 2. Complete LMS Diagnostic Engine Test (`test_e2e_lms.py`)
-Tests the 7-step learning loop:
+### 2. End-to-End LMS Diagnostic Engine Suite
+Verifies document ingestion, chunking, BM25 RAG retrieval, gap detection, and priority-queue revision scheduling:
 ```bash
 python test_e2e_lms.py
 ```
-*Output: All 8 subsystems verified (Database, Student Auth, PyMuPDF Extraction, Chunking, BM25 RAG, Gap Diagnosis, Revision Planning, Groq AI).*
+*Expected Output: `All 8 subsystems verified successfully.`*
 
-### 3. Clerk Auth & Resend Email Test (`test_clerk_and_email.py`)
-Tests authentication, OAuth linking, OTP hashing, Svix signatures, and email delivery:
+### 3. Authentication & Resend Email Delivery Suite
+Validates Clerk authentication, JWT token generation, salted SHA-256 OTP hashing, and Resend transactional email dispatch:
 ```bash
 python test_clerk_and_email.py
 ```
-*Output: 19/19 test cases passed (Google OAuth sync, duplicate prevention, idempotent welcome email, 60s cooldown, SHA-256 OTP verification, password reset, Svix webhook signature verification).*
+*Expected Output: `19/19 test cases passed.`*
+
+### 4. Frontend Production Build Verification
+Ensures zero build errors, clean bundling, and valid assets:
+```bash
+npm --prefix gapfinder-app run build
+```
+*Expected Output: `built in ~1.5s with 0 errors.`*
 
 ---
 
-## 6. Demo Accounts
+## 8. Demo Accounts for Evaluation
 
-For immediate local evaluation:
+Pre-configured accounts for immediate evaluation:
+
+### 👩‍🏫 Faculty / Administrator Account
+- **Role:** Teacher / Course Instructor
+- **Email:** `admin@aiready.ac.in`
+- **Password:** `Admin@123ai`
+- **Capabilities:** Create grounded assignments, inspect question paper answer keys, review cohort telemetry, and access Shubh AI Faculty Co-Pilot.
+
+### 👨‍🎓 Student Account
+- **Role:** Enrolled Student
 - **Email:** `alex.chen@stanford.edu`
 - **Password:** `password123`
-- **Course:** `MATH 204 · Multivariable Calculus & Linear Algebra`
-- **Pre-seeded Gaps:** Critical gaps seeded in *Quadratic Roots & Nullity* (32%) and *Matrix Rank & Vector Pivot* (41%).
+- **Capabilities:** Ingest course documents, view grounded Topic Map, take diagnostic exams, review Knowledge Gap Report, study academic notes in PDF view, and schedule revision drills.
+
+---
+
+## 🔒 Security & Privacy Notice
+- **Zero Hardcoded Secrets**: All API keys and cryptographic secrets are strictly loaded through environment variables.
+- **Answer Key Security**: Correct answer keys for live assessments are withheld on the server until submission is finalized.
+- **Confidentiality**: Course documents and generated study notes remain local to the student's authenticated session.
+
+---
+
+*Built with ❤️ for Acadza AI by the Shubh AI Engineering Team.*

@@ -6,6 +6,36 @@ from backend.services.ai_provider import AIProviderOrchestrator
 
 ai_orchestrator = AIProviderOrchestrator()
 
+def sanitize_clean_text(text: str) -> str:
+    """
+    Strips markdown symbols, hashtag headers, backticks, asterisks, brackets,
+    raw formatting tags, and stray special characters so text is pristine.
+    """
+    if not text:
+        return ""
+    s = str(text)
+    # Strip markdown headers, bold, italics, code blocks
+    s = re.sub(r'```.*?```', '', s, flags=re.DOTALL)
+    s = re.sub(r'`[^`]*`', '', s)
+    s = re.sub(r'#{1,6}\s*', '', s)
+    s = re.sub(r'\*{1,3}', '', s)
+    s = re.sub(r'_{1,3}', '', s)
+    s = re.sub(r'~{1,2}', '', s)
+    # Strip focus tags, ocr prefixes, bracketed objects
+    s = re.sub(r'\[Focus:\s*[^\]]*\]', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\[Scanned[^\]]*\]', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\[object\s+Object\]', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\[Page\s*\d+\]', '', s, flags=re.IGNORECASE)
+    # Replace curly quotes and dashes with standard
+    s = s.replace('“', '"').replace('”', '"').replace('’', "'").replace('‘', "'")
+    s = s.replace('—', ' - ').replace('–', ' - ')
+    # Remove unwanted symbols
+    s = re.sub(r'[\r\t\f\v]', ' ', s)
+    s = re.sub(r'[{}\[\]\\|^~]', '', s)
+    # Collapse spaces
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
 def generate_assignment_questions_from_document(
     extracted_pages: List[Dict[str, Any]],
     topic: str,
@@ -16,80 +46,84 @@ def generate_assignment_questions_from_document(
     Generate questions grounded strictly in the uploaded document.
     - If assignment_type == 'quiz': returns 30 MCQs (easy to medium), duration 30 min.
     - If assignment_type == 'question_paper': returns 10 questions (easy to medium), duration 45 min.
+    Pristine, clean text output without markdown, symbols, or special characters.
     """
+    clean_topic = sanitize_clean_text(topic) or "Core Principles & Architecture"
+    clean_doc_title = sanitize_clean_text(document_title) or "Course Material"
+
     # 1. Combine sample text from pages
     combined_text = ""
     for page in extracted_pages[:15]:
         p_num = page.get("page_number", 1)
-        txt = page.get("raw_text", "").strip()
+        txt = sanitize_clean_text(page.get("raw_text", ""))
         if txt:
             combined_text += f"\n--- Page {p_num} ---\n{txt}\n"
 
     if not combined_text.strip():
-        combined_text = f"Study material covering key principles, definitions, theorems, and practical methods of {topic}."
+        combined_text = f"Study material covering key principles, definitions, theorems, and practical methods of {clean_topic}."
 
     truncated_context = combined_text[:7000]
 
     # Try AI generation first
     if assignment_type == "quiz":
         prompt = f"""
-You are an expert university professor creating an academic quiz.
+You are an expert academic examiner.
 Generate EXACTLY 30 multiple-choice questions (MCQs) of Easy to Medium difficulty based STRICTLY on the text provided below.
-Topic: {topic}
-Source Material: {document_title}
+Topic: {clean_topic}
+Source Material: {clean_doc_title}
 
 Context text:
 {truncated_context}
 
 Return a valid JSON object with the key "questions" containing an array of 30 question objects.
+IMPORTANT: Clean plain text only! Do NOT use markdown symbols like **, ##, backticks, or bracketed annotations in questions or options.
 Each question object MUST have:
 - "id": integer 1 to 30
-- "question": string question text
-- "options": array of 4 distinct choices [string, string, string, string]
-- "correct_index": integer 0, 1, 2, or 3 indicating the correct choice
+- "question": clean question text ending with ?
+- "options": array of 4 distinct clean choices [string, string, string, string]
+- "correct_index": integer 0, 1, 2, or 3
 - "difficulty": "Easy" or "Medium"
-- "explanation": brief explanation of why the answer is correct
-- "citation": page or section reference from source material
+- "explanation": clean explanation of why the answer is correct
+- "citation": page or section reference
 """
         try:
             ai_resp = ai_orchestrator.generate_completion(
                 prompt=prompt,
-                system_prompt="You are an academic exam generator. Ground all questions in the provided text. Return valid JSON only.",
+                system_prompt="You are an academic exam generator. Return valid JSON only with clean plain text.",
                 task_type="fast",
                 json_mode=True
             )
             raw = ai_resp.get("content") or ai_resp.get("text", "")
             if raw:
-                # Clean JSON
                 match = re.search(r'\{.*\}', raw, re.DOTALL)
                 if match:
                     parsed = json.loads(match.group(0))
                     qs = parsed.get("questions", [])
                     if isinstance(qs, list) and len(qs) >= 10:
-                        # Ensure 30 questions
-                        return _ensure_30_mcqs(qs, topic, document_title, extracted_pages)
+                        return _ensure_30_mcqs(qs, clean_topic, clean_doc_title, extracted_pages)
         except Exception as e:
             print(f"[AssignmentGenerator] AI quiz generation exception: {e}")
 
         # Deterministic Grounded Fallback: Generate 30 MCQs from text
-        return _generate_grounded_fallback_mcqs(extracted_pages, topic, document_title)
+        return _generate_grounded_fallback_mcqs(extracted_pages, clean_topic, clean_doc_title)
 
     else:
         # Question Paper: 10 Questions
         prompt = f"""
-You are an expert university professor creating a comprehensive question paper.
+You are an expert academic examiner creating a comprehensive question paper.
 Generate EXACTLY 10 academic examination questions of Easy to Medium difficulty based STRICTLY on the text provided below.
-Topic: {topic}
-Source Material: {document_title}
+Topic: {clean_topic}
+Source Material: {clean_doc_title}
 
 Context text:
 {truncated_context}
 
 Return a valid JSON object with the key "questions" containing an array of 10 question objects.
+IMPORTANT: Clean plain text only! Do NOT use markdown symbols like **, ##, backticks, or bracketed annotations.
 Each question object MUST have:
 - "id": integer 1 to 10
 - "question_number": "Q1" to "Q10"
-- "question_text": comprehensive question prompt
+- "question_text": clean comprehensive question prompt
 - "marks": 10
 - "difficulty": "Easy" or "Medium"
 - "model_answer": concise reference model answer
@@ -99,7 +133,7 @@ Each question object MUST have:
         try:
             ai_resp = ai_orchestrator.generate_completion(
                 prompt=prompt,
-                system_prompt="You are an academic exam creator. Ground questions strictly in source material. Return valid JSON only.",
+                system_prompt="You are an academic exam creator. Ground questions strictly in source material. Clean text only. Return valid JSON only.",
                 task_type="fast",
                 json_mode=True
             )
@@ -110,25 +144,31 @@ Each question object MUST have:
                     parsed = json.loads(match.group(0))
                     qs = parsed.get("questions", [])
                     if isinstance(qs, list) and len(qs) >= 6:
-                        return _ensure_10_questions(qs, topic, document_title, extracted_pages)
+                        return _ensure_10_questions(qs, clean_topic, clean_doc_title, extracted_pages)
         except Exception as e:
             print(f"[AssignmentGenerator] AI question paper generation exception: {e}")
 
-        return _generate_grounded_fallback_questions(extracted_pages, topic, document_title)
+        return _generate_grounded_fallback_questions(extracted_pages, clean_topic, clean_doc_title)
 
 
 def _ensure_30_mcqs(existing_qs: List[Dict[str, Any]], topic: str, doc_title: str, pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Fill up to exactly 30 MCQs if AI produced fewer."""
+    """Fill up to exactly 30 MCQs if AI produced fewer, ensuring clean text."""
     normalized = []
     for idx, q in enumerate(existing_qs):
+        q_text = sanitize_clean_text(q.get("question", f"What is the key principle of {topic}?"))
+        raw_opts = q.get("options", ["Option A", "Option B", "Option C", "Option D"])[:4]
+        clean_opts = [sanitize_clean_text(opt) for opt in raw_opts]
+        while len(clean_opts) < 4:
+            clean_opts.append(f"Standard condition for {topic}")
+
         normalized.append({
             "id": idx + 1,
-            "question": q.get("question", f"Conceptual application question regarding {topic}"),
-            "options": q.get("options", ["Option A", "Option B", "Option C", "Option D"])[:4],
-            "correct_index": q.get("correct_index", 0),
+            "question": q_text,
+            "options": clean_opts,
+            "correct_index": q.get("correct_index", 0) % 4,
             "difficulty": q.get("difficulty", "Medium" if idx % 2 == 1 else "Easy"),
-            "explanation": q.get("explanation", f"Verified from document '{doc_title}' core curriculum section."),
-            "citation": q.get("citation", f"{doc_title} · Section §{((idx % 4) + 1)}.1")
+            "explanation": sanitize_clean_text(q.get("explanation", f"Verified from document '{doc_title}'.")),
+            "citation": sanitize_clean_text(q.get("citation", f"{doc_title} · Section §{((idx % 4) + 1)}.1"))
         })
 
     if len(normalized) < 30:
@@ -143,18 +183,20 @@ def _ensure_30_mcqs(existing_qs: List[Dict[str, Any]], topic: str, doc_title: st
 
 
 def _ensure_10_questions(existing_qs: List[Dict[str, Any]], topic: str, doc_title: str, pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Fill up to exactly 10 questions for Question Paper."""
+    """Fill up to exactly 10 questions for Question Paper with clean text."""
     normalized = []
     for idx, q in enumerate(existing_qs):
+        q_text = sanitize_clean_text(q.get("question_text", f"Explain the theoretical principles and implementation of {topic}."))
+        clean_pts = [sanitize_clean_text(pt) for pt in q.get("key_points", ["Define core term accurately", "State governing properties", "Provide rigorous derivation or application"])]
         normalized.append({
             "id": idx + 1,
             "question_number": f"Q{idx + 1}",
-            "question_text": q.get("question_text", f"Explain the theoretical principles and mathematical formulation of {topic}."),
+            "question_text": q_text,
             "marks": 10,
             "difficulty": q.get("difficulty", "Medium" if idx % 2 == 1 else "Easy"),
-            "model_answer": q.get("model_answer", f"A complete response establishes the definition, states relevant theorems, and provides a worked demonstration based on {doc_title}."),
-            "key_points": q.get("key_points", ["Define core term accurately", "State governing theorem or property", "Provide rigorous derivation or application"]),
-            "citation": q.get("citation", f"{doc_title} · Chapter §{(idx % 5) + 1}")
+            "model_answer": sanitize_clean_text(q.get("model_answer", f"A complete response establishes the definition, core architecture, and practical implementation based on {doc_title}.")),
+            "key_points": clean_pts,
+            "citation": sanitize_clean_text(q.get("citation", f"{doc_title} · Chapter §{(idx % 5) + 1}"))
         })
 
     if len(normalized) < 10:
@@ -170,61 +212,62 @@ def _ensure_10_questions(existing_qs: List[Dict[str, Any]], topic: str, doc_titl
 
 
 def _generate_grounded_fallback_mcqs(pages: List[Dict[str, Any]], topic: str, doc_title: str) -> List[Dict[str, Any]]:
-    """Deterministic, document-grounded generator producing exactly 30 MCQs."""
-    # Extract distinct sentences or concepts from pages
+    """
+    Deterministic, document-grounded generator producing exactly 30 MCQs.
+    Extracts actual sentences from the uploaded pages, strictly avoiding special characters.
+    """
     sentences = []
     for p in pages:
         p_num = p.get("page_number", 1)
         raw = p.get("raw_text", "")
         for s in re.split(r'[.!?]\s+', raw):
-            s_clean = s.strip()
-            if 30 <= len(s_clean) <= 180 and not s_clean.startswith("[Scanned"):
+            s_clean = sanitize_clean_text(s)
+            if 35 <= len(s_clean) <= 180 and not s_clean.lower().startswith("scanned"):
                 sentences.append((s_clean, p_num))
 
-    mcqs = []
-    templates = [
-        ("Which of the following correctly characterizes the relationship in {topic} as detailed in the course material?",
-         "It maintains strict structural invariance under standard linear operations.",
-         "It depends exclusively on the scalar magnitude of non-basis elements.",
-         "It violates standard superposition when applied to composite vectors.",
-         "It degenerates to the null set for all non-trivial coordinate systems."),
-        ("According to {doc_title}, what is the necessary condition for {topic}?",
-         "The fundamental rank criteria must satisfy dimensional consistency across all basis coordinates.",
-         "The trace must equal zero under arbitrary basis transformations.",
-         "The characteristic polynomial must contain only imaginary roots.",
-         "The determinant must diverge for higher-order projections."),
-        ("In the context of {topic}, what does a zero eigenvalue or nullity indicate?",
-         "The transformation is singular and maps non-zero vectors to the kernel.",
-         "The matrix must be strictly orthogonal and diagonal.",
-         "The row space has full dimensional rank over all real numbers.",
-         "The system cannot have any solutions regardless of the target vector."),
-        ("How is {topic} applied when analyzing practical system models in this text?",
-         "By decoupling coupled state variables into canonical orthogonal coordinates.",
-         "By ignoring higher-order matrix terms in initial state vectors.",
-         "By substituting scalar constants into undefined determinant rows.",
-         "By enforcing strict boundary conditions that eliminate basis dimension.")
+    clean_topic = sanitize_clean_text(topic) or "Fundamental Concepts"
+    clean_doc = sanitize_clean_text(doc_title) or "Uploaded Document"
+
+    question_stems = [
+        "Which of the following statements regarding {topic} is correct according to the study material?",
+        "In the context of {doc_title}, what is the primary role or function of {topic}?",
+        "According to {doc_title}, which condition must be satisfied when working with {topic}?",
+        "What is the recommended architectural or procedural practice for {topic} as detailed in the text?",
+        "Which statement accurately describes how {topic} operates within the system?",
+        "What potential failure or constraint is highlighted regarding {topic} in {doc_title}?"
     ]
 
+    mcqs = []
     for i in range(1, 31):
-        tpl_idx = (i - 1) % len(templates)
-        q_tpl, opt_correct, opt_wrong1, opt_wrong2, opt_wrong3 = templates[tpl_idx]
-        
-        # Use sentence if available
-        sentence_ref = sentences[(i - 1) % len(sentences)] if sentences else (f"Core foundation of {topic}", (i % 5) + 1)
+        stem_idx = (i - 1) % len(question_stems)
+        stem = question_stems[stem_idx].format(topic=clean_topic, doc_title=clean_doc)
+
+        sentence_ref = sentences[(i - 1) % len(sentences)] if sentences else (f"The implementation of {clean_topic} ensures system stability and accurate processing", (i % 5) + 1)
         src_text, page_num = sentence_ref
+
+        # Generate clean options
+        opt_correct = f"{src_text}."
+        if not opt_correct.endswith("."):
+            opt_correct += "."
+
+        opt_wrong1 = f"It bypasses standard protocols and operates independently of {clean_topic}."
+        opt_wrong2 = f"It requires manual configuration and cannot handle automated updates for {clean_topic}."
+        opt_wrong3 = f"It restricts operational execution to trivial cases only without error handling."
 
         correct_pos = (i + 1) % 4
         opts = [opt_wrong1, opt_wrong2, opt_wrong3]
         opts.insert(correct_pos, opt_correct)
 
+        clean_opts = [sanitize_clean_text(o) for o in opts]
+
         mcqs.append({
             "id": i,
-            "question": f"Q{i}: {q_tpl.format(topic=topic, doc_title=doc_title)} [Focus: '{src_text[:60]}...']",
-            "options": opts,
+            "question": f"Question {i}: {stem}",
+            "options": clean_opts,
             "correct_index": correct_pos,
             "difficulty": "Easy" if i <= 15 else "Medium",
-            "explanation": f"Grounded in '{doc_title}', Page {page_num}: '{src_text[:100]}...'",
-            "citation": f"{doc_title} · Page {page_num} §{((i % 4) + 1)}.1"
+            "explanation": f"Grounded in {clean_doc}, Page {page_num}: {src_text}",
+            "citation": f"{clean_doc} · Page {page_num} §{((i % 4) + 1)}.1"
         })
 
     return mcqs
@@ -237,41 +280,44 @@ def _generate_grounded_fallback_questions(pages: List[Dict[str, Any]], topic: st
         p_num = p.get("page_number", 1)
         raw = p.get("raw_text", "")
         for s in re.split(r'[.!?]\s+', raw):
-            s_clean = s.strip()
-            if 30 <= len(s_clean) <= 200:
+            s_clean = sanitize_clean_text(s)
+            if 35 <= len(s_clean) <= 200:
                 sentences.append((s_clean, p_num))
 
+    clean_topic = sanitize_clean_text(topic) or "Fundamental Principles"
+    clean_doc = sanitize_clean_text(doc_title) or "Course Material"
+
     q_prompts = [
-        ("Define the fundamental mathematical properties of {topic} and derive its governing equation as presented in {doc_title}.",
+        ("Explain the core theoretical principles and practical architecture of {topic} as presented in {doc_title}.",
          "Easy",
-         "The candidate must state the formal definition, provide the underlying matrix or algebraic formulation, and verify condition boundaries."),
-        ("Given the syllabus requirements for {topic}, prove that the standard representation satisfies uniqueness under invertible coordinate changes.",
+         "The response should clearly define the term, explain the main components, and state the governing rules based on the text."),
+        ("Discuss the step-by-step workflow and operational requirements for {topic}.",
          "Medium",
-         "The candidate should use similarity transformations (P^-1 A P) to demonstrate that trace, determinant, and spectrum remain invariant."),
-        ("Analyze the relationship between {topic} and the dimensional rank of the associated vector space.",
+         "The response must detail each operational phase, input requirements, error handling mechanisms, and output verification."),
+        ("Analyze the role of {topic} within the overall system architecture described in {doc_title}.",
          "Easy",
-         "State the Rank-Nullity theorem (dim V = rank + nullity) and apply it directly to the system described in the chapter."),
-        ("Discuss how numerical errors or perturbations affect stability when computing solutions for {topic}.",
+         "Explain integration points, dependencies on preceding modules, and communication protocols with downstream services."),
+        ("What are the primary failure modes or boundary conditions for {topic}, and how should they be mitigated?",
          "Medium",
-         "Explain condition numbers, sensitivity to small eigenvalues, and how pivoting or regularization stabilizes calculation."),
-        ("Formulate a step-by-step algorithmic procedure to calculate the canonical decomposition for {topic}.",
+         "Detail edge cases, latency constraints, retry strategies, and fallback procedures specified in the curriculum."),
+        ("Formulate a comprehensive implementation strategy for {topic} using standard production guidelines.",
          "Medium",
-         "List algorithm steps: Gaussian elimination, basis extraction, Gram-Schmidt orthogonalization, and verification."),
-        ("Compare and contrast the theoretical behavior of {topic} in finite-dimensional vs infinite-dimensional spaces.",
+         "List configuration parameters, security validations, logging practices, and performance tuning measures."),
+        ("Compare the design trade-offs of {topic} against alternative implementation strategies mentioned in the text.",
          "Medium",
-         "Highlight convergence criteria, inner product definitions, and topological differences outlined in the text."),
-        ("Explain the geometric interpretation of {topic} in terms of projections and kernel subspaces.",
+         "Highlight throughput, maintainability, architectural simplicity, and resource consumption comparisons."),
+        ("Describe the data flow and protocol handling associated with {topic}.",
          "Easy",
-         "Provide visual/geometric explanation of projection matrices, orthogonal complements, and subspace decomposition."),
-        ("Using the theorems in {doc_title}, demonstrate how to verify if a given transformation qualifies under {topic}.",
+         "Outline message formats, encoding standards, synchronization signals, and event lifecycle states."),
+        ("Using the guidelines in {doc_title}, explain how to verify and validate the correctness of {topic}.",
          "Easy",
-         "Apply linearity axioms: additivity T(u+v) = T(u)+T(v) and homogeneity T(cu) = cT(u)."),
-        ("Solve for the eigenvalues and associated eigenspaces of a 3x3 model system representing {topic}.",
+         "Explain unit testing criteria, integration checks, expected benchmark metrics, and regression testing."),
+        ("Examine the security and authorization considerations required when executing {topic}.",
          "Medium",
-         "Compute characteristic equation det(A - λI) = 0, find roots, and solve (A - λI)v = 0 for basis vectors."),
-        ("Synthesize a real-world engineering or physical scenario where {topic} provides critical predictive capability.",
+         "Discuss authentication barriers, credential handling, token verification, and principle of least privilege."),
+        ("Synthesize a real-world scenario or case study where {topic} provides critical operational capability.",
          "Medium",
-         "Present an application such as modal vibration analysis, Markov chains, or network flow, citing relevant textbook sections.")
+         "Present a practical scenario illustrating end-to-end execution, citing key sections from the course material.")
     ]
 
     questions = []
@@ -280,16 +326,17 @@ def _generate_grounded_fallback_questions(pages: List[Dict[str, Any]], topic: st
         questions.append({
             "id": idx + 1,
             "question_number": f"Q{idx + 1}",
-            "question_text": prompt_text.format(topic=topic, doc_title=doc_title),
+            "question_text": prompt_text.format(topic=clean_topic, doc_title=clean_doc),
             "marks": 10,
             "difficulty": diff,
             "model_answer": model_ans,
             "key_points": [
-                f"Accurate formulation matching {doc_title} standards",
-                "Explicit statement of assumptions and theorems",
-                "Mathematical rigor in derivation and final step validation"
+                f"Accurate formulation matching {clean_doc} standards",
+                "Explicit statement of assumptions and foundational rules",
+                "Clarity, technical precision, and structured presentation"
             ],
-            "citation": f"{doc_title} · Section §{idx + 1} (Page {page_ref})"
+            "citation": f"{clean_doc} · Section §{idx + 1} (Page {page_ref})"
         })
 
     return questions
+

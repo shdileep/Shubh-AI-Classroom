@@ -150,19 +150,6 @@ async def upload_document(
                 except Exception as t_err:
                     print(f"[Documents] Topic insert notice: {t_err}")
 
-                # Ensure topic is recorded in knowledge gaps as untested
-                chk_gap_sql = "SELECT id FROM knowledge_gaps WHERE user_id = %s AND topic = %s" if IS_POSTGRES else "SELECT id FROM knowledge_gaps WHERE user_id = ? AND topic = ?"
-                cur.execute(chk_gap_sql, (user_id, t_name))
-                if not cur.fetchone():
-                    ins_gap_sql = """
-                        INSERT INTO knowledge_gaps (user_id, topic, mastery_score, priority, status)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """ if IS_POSTGRES else """
-                        INSERT INTO knowledge_gaps (user_id, topic, mastery_score, priority, status)
-                        VALUES (?, ?, ?, ?, ?)
-                    """
-                    cur.execute(ins_gap_sql, (user_id, t_name, 0, "High", "Untested"))
-
         # Generate comprehensive study notes and visual concept diagram
         study_notes_md, mermaid_diag = document_processor.generate_study_notes_and_diagram(extracted_pages, filename, hierarchy)
 

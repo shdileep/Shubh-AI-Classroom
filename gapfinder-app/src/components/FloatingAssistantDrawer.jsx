@@ -15,7 +15,8 @@ export default function FloatingAssistantDrawer({
   assistantLoading,
   onSendMessage,
   currentUser,
-  isTakingAssessment = false
+  isTakingAssessment = false,
+  isTeacher = false
 }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -83,13 +84,15 @@ export default function FloatingAssistantDrawer({
             setIsMaximized(false);
             onToggle();
           }}
-          aria-label="Open Shubh AI Assistant"
+          aria-label={isTeacher ? "Open Shubh AI Faculty Co-Pilot" : "Open Shubh AI Student Assistant"}
           className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-[#003B1B] via-[#0A0D0E] to-[#003B1B] hover:from-[#003B1B] hover:to-[#14532D] text-white rounded-full shadow-[0_10px_25px_-5px_rgba(0,59,27,0.4)] border border-emerald-500/40 transition-all duration-300 hover:scale-105 group cursor-pointer"
         >
           <div className="w-6 h-6 rounded-full bg-emerald-400/20 text-emerald-300 flex items-center justify-center">
             <Sparkles className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
           </div>
-          <span className="text-xs font-bold tracking-wide">Shubh AI</span>
+          <span className="text-xs font-bold tracking-wide">
+            {isTeacher ? "Shubh AI · Faculty Co-Pilot" : "Shubh AI Assistant"}
+          </span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#6BFF8F]"></span>
         </button>
       )}
@@ -110,8 +113,12 @@ export default function FloatingAssistantDrawer({
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <div>
-                <h3 className="text-xs font-black text-gray-900 tracking-tight leading-tight">Shubh AI Assistant</h3>
-                <p className="text-[10px] text-gray-500 font-medium leading-none mt-0.5">Study & Concept Assistant</p>
+                <h3 className="text-xs font-black text-gray-900 tracking-tight leading-tight">
+                  {isTeacher ? "Shubh AI Faculty Co-Pilot" : "Shubh AI Assistant"}
+                </h3>
+                <p className="text-[10px] text-gray-500 font-medium leading-none mt-0.5">
+                  {isTeacher ? "Curriculum & Institutional Intelligence" : "Study & Concept Assistant"}
+                </p>
               </div>
             </div>
 
@@ -164,6 +171,52 @@ export default function FloatingAssistantDrawer({
 
           {/* Message Body */}
           <div className="flex-1 p-3.5 overflow-y-auto space-y-3 custom-scrollbar bg-[#FAF9F7]">
+            {/* Empty State with Role-Specific Quick Prompts */}
+            {assistantMessages.length === 0 && (
+              <div className="py-6 text-center space-y-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-[#006E2F] flex items-center justify-center mx-auto shadow-xs">
+                  <Sparkles className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-900">
+                    {isTeacher ? "Faculty & Curriculum Co-Pilot" : "Personal Academic Assistant"}
+                  </h4>
+                  <p className="text-[11px] text-gray-500 max-w-xs mx-auto mt-0.5">
+                    {isTeacher
+                      ? "Analyze class bottlenecks, draft grounded tests, or plan student remediation."
+                      : "Ask questions, review missed test answers, or generate concept flowcharts."}
+                  </p>
+                </div>
+
+                <div className="pt-2 flex flex-col gap-1.5 text-left">
+                  {(isTeacher
+                    ? [
+                        "📊 Analyze cohort weak topics across all students",
+                        "📝 Draft 10 exam questions for struggling topics",
+                        "⚠️ Surface students with <50% mastery",
+                        "📋 Calibrate grading rubric and citations"
+                      ]
+                    : [
+                        "🎯 What are my critical knowledge gaps?",
+                        "📅 Synthesize an adaptive 5-day study plan",
+                        "🔍 Explain the questions I missed in the test",
+                        "⚡ Generate a concept flowchart"
+                      ]
+                  ).map((promptText, pIdx) => (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      onClick={() => onSendMessage(promptText)}
+                      className="px-3 py-1.5 text-[11px] font-medium bg-white hover:bg-emerald-50 text-gray-700 hover:text-emerald-900 rounded-xl border border-gray-200 transition-colors text-left flex items-center justify-between group cursor-pointer"
+                    >
+                      <span className="truncate">{promptText}</span>
+                      <ArrowUpRight className="w-3 h-3 text-gray-400 group-hover:text-emerald-700 shrink-0 ml-1" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Message Stream */}
             {assistantMessages.map((msg, idx) => (
               <div key={idx} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -234,7 +287,7 @@ export default function FloatingAssistantDrawer({
 
               <input
                 type="text"
-                placeholder="Ask Shubh AI Assistant..."
+                placeholder={isTeacher ? "Ask Shubh AI Faculty Co-Pilot..." : "Ask Shubh AI Assistant..."}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}

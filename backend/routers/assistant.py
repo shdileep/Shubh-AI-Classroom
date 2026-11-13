@@ -22,14 +22,112 @@ class AssistantChatRequest(BaseModel):
 @router.post("/chat")
 def chat_with_assistant(req: AssistantChatRequest, current_user: Dict[str, Any] = Depends(get_current_user_flexible)):
     """
-    Shubh AI Assistant — Academic Study and Concept Mastery Assistant.
-    Provides concise, professional, grounded explanations, revision plans, and flowchart synthesis.
+    Shubh AI Assistant — Domain-Specific Assistant.
+    - If user is Teacher/Admin: Functions as Faculty & Curriculum Co-Pilot (Cohort analytics, exam drafting, rubric calibration, weaker students remediation).
+    - If user is Student: Functions as Academic Study & Concept Mastery Assistant.
     """
     user_id = current_user.get("sub", 1)
-    student_name = current_user.get("name", "Student")
+    user_name = current_user.get("name", "User")
+    user_role = (current_user.get("role") or "").lower()
+    is_faculty = user_role in ["teacher", "admin", "instructor", "faculty"] or current_user.get("email") == "admin@aiready.ac.in"
     query = req.message.strip()
     lowered_query = query.lower()
     topic = req.topic or "Foundational Concepts"
+
+    # =========================================================================
+    # FACULTY & ADMIN DOMAIN-SPECIFIC SHUBH AI
+    # =========================================================================
+    if is_faculty:
+        # Identity query for Faculty
+        if any(k in lowered_query for k in ["what is your name", "what is ur name", "who are you", "who are u", "ur name", "your name"]):
+            return {
+                "reply": (
+                    f"Hello Professor/Administrator {user_name}! I am **Shubh AI Faculty Co-Pilot**, your dedicated institutional and curriculum intelligence assistant in GapFinder.\n\n"
+                    f"**Admin & Faculty Capabilities:**\n"
+                    f"- **Cohort Performance Telemetry:** Pinpoint syllabus topics with low pass rates across your student cohort.\n"
+                    f"- **Automated Exam & Quiz Drafting:** Generate 30-question adaptive MCQs and 10-question subjective papers grounded in uploaded course documents.\n"
+                    f"- **Weaker Students Remediation:** Identify students scoring <50% mastery and automatically schedule targeted micro-drills.\n"
+                    f"- **Rubric & Answer Key Calibration:** Verify question keys, citations, and model answers before publishing to student dashboards.\n\n"
+                    f"How can I assist your course administration today?"
+                ),
+                "citations": [],
+                "decision_info": {
+                    "agent_name": "Shubh AI Faculty Co-Pilot",
+                    "faculty_name": user_name,
+                    "domain": "Faculty & Administration",
+                    "decision": "Assisted with faculty co-pilot identity inquiry"
+                }
+            }
+
+        # Greetings for Faculty
+        if lowered_query in ["hi", "hello", "hey", "good morning", "good evening", "greetings"]:
+            return {
+                "reply": f"Welcome back, {user_name}! Shubh AI Faculty Co-Pilot is online. Would you like to review cohort mastery analytics, draft a new grounded quiz from uploaded materials, or check on students requiring remediation?",
+                "citations": [],
+                "decision_info": {
+                    "agent_name": "Shubh AI Faculty Co-Pilot",
+                    "domain": "Faculty & Administration"
+                }
+            }
+
+        # Cohort weak students / class performance inquiry
+        if any(k in lowered_query for k in ["weak student", "struggling", "cohort", "class performance", "weaker students", "remediation"]):
+            conn = get_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute("SELECT COUNT(*) FROM users WHERE role = 'student'")
+                st_count = cur.fetchone()[0] or 0
+
+                cur.execute("SELECT COUNT(*) FROM teacher_assignments")
+                asg_count = cur.fetchone()[0] or 0
+
+                cur.execute("SELECT COUNT(*) FROM assignment_submissions")
+                sub_count = cur.fetchone()[0] or 0
+            finally:
+                cur.close()
+                conn.close()
+
+            return {
+                "reply": (
+                    f"### 📊 Cohort Telemetry Summary for {user_name}\n\n"
+                    f"- **Total Registered Students:** {st_count} enrolled\n"
+                    f"- **Published Quizzes & Question Papers:** {asg_count} active\n"
+                    f"- **Completed Submissions:** {sub_count} evaluated\n\n"
+                    f"**Faculty Recommendations:**\n"
+                    f"1. **Targeted Assessment:** Schedule a 30-question diagnostic quiz on newly uploaded chapters to identify knowledge gaps before midterm examinations.\n"
+                    f"2. **Automated Reminders:** Ensure all students with <50% mastery on foundational topics receive 5-minute pre-session revision notifications via Resend.\n"
+                    f"3. **Material Grounding:** Use the 'Create Assignment' tab to upload textbook chapters; questions and green-labeled answer keys will be compiled automatically."
+                ),
+                "citations": ["Institutional LMS Registry"],
+                "decision_info": {
+                    "agent_name": "Shubh AI Faculty Co-Pilot",
+                    "domain": "Faculty & Administration",
+                    "decision": "Generated cohort analytics overview"
+                }
+            }
+
+        # Exam drafting / question paper request
+        if any(k in lowered_query for k in ["draft", "generate question", "create quiz", "make question paper", "exam question"]):
+            return {
+                "reply": (
+                    f"### 📝 Curriculum Question Paper Drafting\n\n"
+                    f"To generate a calibrated examination grounded strictly in your syllabus:\n\n"
+                    f"1. Navigate to **'Create Assignment'** in the faculty sidebar.\n"
+                    f"2. Choose your format: **Adaptive Quiz** (30 MCQs · 30 Mins) or **Question Paper** (10 Analytical Problems · 45 Mins).\n"
+                    f"3. Upload your course PDF, DOCX, or Markdown syllabus.\n"
+                    f"4. Click **'Generate & Publish to All Students'** — all questions and green-labeled answer keys will be synthesized instantaneously without special characters or formatting artifacts."
+                ),
+                "citations": ["Academic Assessment Generator"],
+                "decision_info": {
+                    "agent_name": "Shubh AI Faculty Co-Pilot",
+                    "domain": "Faculty & Administration"
+                }
+            }
+
+    # =========================================================================
+    # STUDENT DOMAIN-SPECIFIC SHUBH AI
+    # =========================================================================
+    student_name = user_name
 
     # 1. Direct identity query handler
     if any(k in lowered_query for k in ["what is your name", "what is ur name", "what's your name", "who are you", "who are u", "who r u", "who r you", "who made you", "ur name", "your name"]):
