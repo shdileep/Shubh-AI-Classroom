@@ -89,6 +89,16 @@ async def root_resend_webhook(request: Request):
 async def root_clerk_webhook(request: Request):
     return await auth.clerk_webhook(request)
 
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "service": "GapFinder AI EdTech Backend & API",
+        "version": "2.4.0",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
+
 @app.get("/api/health")
 def health_check():
     return {

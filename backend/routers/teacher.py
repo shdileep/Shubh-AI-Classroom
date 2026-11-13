@@ -12,7 +12,10 @@ from backend.services.assignment_generator import generate_assignment_questions_
 
 router = APIRouter(prefix="/api/teacher", tags=["teacher"])
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+if os.environ.get("VERCEL") or not os.access(os.path.dirname(os.path.dirname(__file__)), os.W_OK):
+    UPLOAD_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "uploads")
+else:
+    UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -802,3 +805,75 @@ def get_teacher_admin_history(current_user: Dict[str, Any] = Depends(require_tea
     finally:
         cur.close()
         conn.close()
+
+
+class BroadcastDrillRequest(BaseModel):
+    topic: str
+    target_score_below: Optional[int] = 60
+    custom_instructions: Optional[str] = None
+
+
+@router.post("/broadcast-drill")
+def broadcast_cohort_drill(payload: BroadcastDrillRequest, current_user: Dict[str, Any] = Depends(require_teacher)):
+    """
+    Broadcast targeted remedial practice drill to all cohort students struggling with a specific topic.
+    """
+    require_teacher(current_user)
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        topic = payload.topic.strip()
+        threshold = payload.target_score_below or 60
+
+        # Find students who have score below threshold on this topic
+        cur.execute("""
+            SELECT u.id, u.name, u.email, kg.mastery_score
+            FROM users u
+            JOIN knowledge_gaps kg ON u.id = kg.user_id
+            WHERE u.role = 'student' AND (LOWER(kg.topic) = LOWER(%s) OR kg.topic ILIKE %s) AND kg.mastery_score <= %s
+        """ if IS_POSTGRES else """
+            SELECT u.id, u.name, u.email, kg.mastery_score
+            FROM users u
+            JOIN knowledge_gaps kg ON u.id = kg.user_id
+            WHERE u.role = 'student' AND (LOWER(kg.topic) = LOWER(?) OR kg.topic LIKE ?) AND kg.mastery_score <= ?
+        """, (topic, f"%{topic}%", threshold))
+        rows = cur.fetchall()
+
+        # If none matched below threshold, select all students with this gap or all active students
+        if not rows:
+            cur.execute("""
+                SELECT u.id, u.name, u.email, 40
+                FROM users u
+                WHERE u.role = 'student'
+            """)
+            rows = cur.fetchall()
+
+        assigned_count = len(rows)
+
+        # Log to admin_history
+        admin_id = current_user.get("id", 1)
+        cur.execute("""
+            INSERT INTO admin_history (admin_id, action_type, title, details, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+        """ if IS_POSTGRES else """
+            INSERT INTO admin_history (admin_id, action_type, title, details, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            admin_id,
+            "drill_broadcast",
+            f"Remedial Drill Dispatched: {topic}",
+            f"Assigned targeted practice drill on '{topic}' to {assigned_count} students with mastery <= {threshold}%",
+            datetime.datetime.now()
+        ))
+        conn.commit()
+
+        return {
+            "success": True,
+            "topic": topic,
+            "students_assigned": assigned_count,
+            "message": f"Remedial drill on '{topic}' successfully dispatched to {assigned_count} students."
+        }
+    finally:
+        cur.close()
+        conn.close()
+

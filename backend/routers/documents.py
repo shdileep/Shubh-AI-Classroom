@@ -9,7 +9,10 @@ from backend.services.rag_engine import rag_engine
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+if os.environ.get("VERCEL") or not os.access(os.path.dirname(os.path.dirname(__file__)), os.W_OK):
+    UPLOAD_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "uploads")
+else:
+    UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.get("")

@@ -27,6 +27,13 @@ else:
 
 if os.environ.get("VERCEL"):
     SQLITE_PATH = "/tmp/gapfinder.db"
+    src_db = os.path.join(os.path.dirname(__file__), "gapfinder.db")
+    if os.path.exists(src_db) and not os.path.exists(SQLITE_PATH):
+        try:
+            import shutil
+            shutil.copyfile(src_db, SQLITE_PATH)
+        except Exception:
+            pass
 else:
     SQLITE_PATH = os.path.join(os.path.dirname(__file__), "gapfinder.db")
 

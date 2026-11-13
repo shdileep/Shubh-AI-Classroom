@@ -1363,221 +1363,980 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#064E3B] text-white p-6 sm:p-8 rounded-3xl border border-slate-700 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-2">
                   <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-300 bg-white/10 px-3 py-1 rounded-full border border-emerald-500/30">
-                    <span>👨‍🏫 Institutional Instructor Telemetry Hub · Faculty Access</span>
+                    <span>👨‍🏫 Institutional Faculty Telemetry & Cohort Control</span>
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                    {teacherData?.class_name || "MATH 204 · Multivariable Calculus & Linear Systems"}
+                    {teacherData?.class_name || "Foundational STEM & Linear Systems"}
                   </h1>
                   <p className="text-sm text-slate-300">
-                    Lead Instructor: <strong className="text-white">{teacherData?.instructor || "Dr. Elena Rostova"}</strong> · Real-time topic mastery tracking across enrolled student cohort.
+                    Lead Faculty: <strong className="text-white">{currentUser?.name || teacherData?.instructor || "Faculty Administrator"}</strong> · Real-time curriculum grounding, student material audits, and Bayesian gap telemetry.
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const token = getToken();
-                      fetch('/api/teacher/overview', { headers: { 'Authorization': `Bearer ${token}` } })
-                        .then(res => res.json())
-                        .then(data => { setTeacherData(data); showToast('Refreshed class cohort analytics!'); });
+                      try {
+                        const [ovRes, stRes, aRes, hRes, wRes, gRes] = await Promise.all([
+                          fetch('/api/teacher/overview', { headers: { 'Authorization': `Bearer ${token}` } }),
+                          fetch('/api/teacher/students', { headers: { 'Authorization': `Bearer ${token}` } }),
+                          fetch('/api/teacher/assignments', { headers: { 'Authorization': `Bearer ${token}` } }),
+                          fetch('/api/teacher/history', { headers: { 'Authorization': `Bearer ${token}` } }),
+                          fetch('/api/teacher/weaker-students', { headers: { 'Authorization': `Bearer ${token}` } }),
+                          fetch('/api/teacher/cohort-progress-graph', { headers: { 'Authorization': `Bearer ${token}` } })
+                        ]);
+                        if (ovRes.ok) setTeacherData(await ovRes.json());
+                        if (stRes.ok) { const d = await stRes.json(); setTeacherStudentsList(d.students || []); }
+                        if (aRes.ok) { const d = await aRes.json(); setTeacherAssignmentsList(d.assignments || []); }
+                        if (hRes.ok) { const d = await hRes.json(); setAdminHistoryList(d.history || []); }
+                        if (wRes.ok) { const d = await wRes.json(); setWeakerStudentsList(d.weaker_students || []); }
+                        if (gRes.ok) setCohortGraphData(await gRes.json());
+                        showToast('Telemetry refreshed in real time!');
+                      } catch (e) {
+                        showToast('Error refreshing data', 'error');
+                      }
                     }}
-                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/20 transition-all flex items-center gap-2 cursor-pointer"
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/20 transition-all flex items-center gap-2 cursor-pointer shadow-xs"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" /> Refresh Telemetry
+                    <RefreshCw className="w-3.5 h-3.5" /> Refresh Telemetry
                   </button>
                 </div>
               </div>
 
-              {/* Cohort KPIs */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Enrolled Cohort</span>
-                  <div className="text-2xl font-black text-gray-900">{teacherData?.total_students || 9} Students</div>
-                  <span className="text-[11px] text-emerald-600 font-semibold block">100% active this week</span>
-                </div>
-
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Cohort Mean Mastery</span>
-                  <div className="text-2xl font-black text-gray-900">{teacherData?.overall_class_mastery || 68}%</div>
-                  <span className="text-[11px] text-amber-600 font-semibold block">Target benchmark: ≥75%</span>
-                </div>
-
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Critical Cohort Gaps</span>
-                  <div className="text-2xl font-black text-[#BA1A1A]">{teacherData?.critical_topics_count || 2} Topics</div>
-                  <span className="text-[11px] text-red-500 font-semibold block">Failure rate &gt; 40%</span>
-                </div>
-
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Scholars Needing Support</span>
-                  <div className="text-2xl font-black text-amber-600">{teacherData?.students_at_risk_count || 3} Scholars</div>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Prerequisite intervention</span>
-                </div>
+              {/* Sub-Navigation Tabs */}
+              <div className="flex items-center gap-2 border-b border-gray-200 pb-3 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setTeacherActiveTab('overview')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    teacherActiveTab === 'overview'
+                      ? 'bg-[#003B1B] text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Cohort Directory & Analytics</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTeacherActiveTab('create_assignment')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    teacherActiveTab === 'create_assignment'
+                      ? 'bg-[#003B1B] text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Create Assignment (Quiz / Question Paper)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTeacherActiveTab('submissions')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    teacherActiveTab === 'submissions'
+                      ? 'bg-[#003B1B] text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Student Submissions & Attempts ({teacherAssignmentsList.reduce((acc, a) => acc + (a.submissions_count || 0), 0)})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTeacherActiveTab('history')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    teacherActiveTab === 'history'
+                      ? 'bg-[#003B1B] text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>Admin History & Audit Trail ({adminHistoryList.length})</span>
+                </button>
               </div>
 
-              {/* Cohort Topic Gap Matrix */}
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900">Class Knowledge Gap Distribution & Failure Rates</h2>
-                    <p className="text-xs text-gray-500 mt-0.5">Topic-by-topic diagnostic breakdown across all enrolled students.</p>
+              {/* ===================== TAB 1: COHORT DIRECTORY & ANALYTICS ===================== */}
+              {teacherActiveTab === 'overview' && (
+                <div className="space-y-8">
+                  {/* 1. FIRST 3 KPI CARDS: Total Students, Assignments, Analytics */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* Card 1: Total Students */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-emerald-300 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Students</span>
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#006E2F] flex items-center justify-center">
+                          <Users className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div className="text-3xl font-black text-gray-900">
+                        {teacherData?.total_students || teacherStudentsList.length || 9}
+                      </div>
+                      <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded inline-block">
+                        Active registered cohort in database
+                      </span>
+                    </div>
+
+                    {/* Card 2: Assignments */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-emerald-300 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Assignments</span>
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                          <ClipboardCheck className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div className="text-3xl font-black text-gray-900">
+                        {teacherData?.total_assignments || teacherAssignmentsList.length || 0}
+                      </div>
+                      <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded inline-block">
+                        Published Quizzes & Question Papers
+                      </span>
+                    </div>
+
+                    {/* Card 3: Analytics */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-emerald-300 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Analytics</span>
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                          <TrendingUp className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-gray-900">
+                          {teacherData?.overall_class_mastery || 65}%
+                        </span>
+                        <span className="text-xs text-gray-500 font-medium">Cohort Mean Mastery</span>
+                      </div>
+                      <span className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded inline-block">
+                        Target benchmark standard: ≥75%
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs font-semibold text-emerald-900 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                    Ranked by Class Failure Rate
-                  </span>
-                </div>
 
-                <div className="space-y-4">
-                  {(teacherData?.topic_diagnoses || []).map((t, idx) => (
-                    <div key={idx} className="p-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-all bg-gray-50/50 space-y-3">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                              t.cohort_priority === 'Critical Cohort Gap' ? 'bg-red-100 text-red-800 border border-red-200' :
-                              t.cohort_priority === 'Needs Cohort Review' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                              'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            }`}>
-                              {t.cohort_priority}
-                            </span>
-                            <h3 className="font-bold text-gray-900 text-sm">{t.topic}</h3>
-                          </div>
-                          <span className="text-[11px] text-gray-500 block mt-0.5">{t.unit} · Exam Weight: <strong>{t.exam_weight}</strong></span>
+                  {/* 2. TABULAR STUDENT DIRECTORY (Directly below 3 cards) */}
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FAF8F5]">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            Live Student Registry
+                          </span>
+                          <h2 className="text-base font-bold text-gray-900">Registered Students Directory</h2>
                         </div>
-
-                        <div className="flex items-center gap-4 text-xs font-mono">
-                          <div>
-                            <span className="text-gray-400 block text-[10px]">Avg Mastery</span>
-                            <span className="font-bold text-gray-900">{t.class_average_mastery}%</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400 block text-[10px]">Class Failure Rate</span>
-                            <span className={`font-bold ${t.failure_rate_pct >= 40 ? 'text-red-600' : 'text-amber-600'}`}>
-                              {t.failure_rate_pct}% ({t.critical_students_count} students)
-                            </span>
-                          </div>
-                          <button
-                            disabled={broadcastingDrill}
-                            onClick={async () => {
-                              setBroadcastingDrill(true);
-                              try {
-                                const token = getToken();
-                                const bRes = await fetch('/api/teacher/broadcast-drill', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                  body: JSON.stringify({ topic: t.topic })
-                                });
-                                if (bRes.ok) {
-                                  const bData = await bRes.json();
-                                  showToast(`Broadcasted remedial drill on ${t.topic} to ${bData.students_assigned} students!`);
-                                }
-                              } catch (e) {
-                                showToast('Failed to broadcast drill', 'error');
-                              } finally {
-                                setBroadcastingDrill(false);
-                              }
-                            }}
-                            className="px-3 py-1.5 bg-[#003B1B] hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-                          >
-                            Broadcast Drill
-                          </button>
-                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Click the Eye Icon on any student to inspect their uploaded materials, topics studying, page counts, and upload dates.
+                        </p>
                       </div>
+                      <span className="text-xs font-semibold text-gray-700 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shrink-0">
+                        {teacherStudentsList.length || 9} Students Listed
+                      </span>
+                    </div>
 
-                      {/* Visual Mastery Distribution Bar */}
-                      <div className="space-y-1">
-                        <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden flex">
-                          <div style={{ width: `${(t.critical_students_count / (t.students_tested || 1)) * 100}%` }} className="bg-red-500 h-full"></div>
-                          <div style={{ width: `${(t.review_students_count / (t.students_tested || 1)) * 100}%` }} className="bg-amber-400 h-full"></div>
-                          <div style={{ width: `${(t.mastered_students_count / (t.students_tested || 1)) * 100}%` }} className="bg-emerald-500 h-full"></div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                          <tr>
+                            <th className="py-3 px-4">S.No</th>
+                            <th className="py-3 px-4">Student Name</th>
+                            <th className="py-3 px-4">Institutional Email</th>
+                            <th className="py-3 px-4">Materials Uploaded</th>
+                            <th className="py-3 px-4">Topics Studied</th>
+                            <th className="py-3 px-4">Average Mastery</th>
+                            <th className="py-3 px-4 text-center">Inspect Material</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {teacherStudentsList.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-gray-400">Loading student registry...</td>
+                            </tr>
+                          ) : (
+                            teacherStudentsList.map((st, idx) => (
+                              <tr key={st.id || idx} className="hover:bg-emerald-50/40 transition-colors">
+                                <td className="py-3.5 px-4 font-mono font-bold text-gray-500">{st.s_no || idx + 1}</td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-bold text-gray-900 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-[#006E2F] text-[10px] font-bold flex items-center justify-center">
+                                      {st.name.charAt(0)}
+                                    </div>
+                                    <span>{st.name}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 font-mono text-gray-600">{st.email}</td>
+                                <td className="py-3.5 px-4">
+                                  <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-800">
+                                    {st.materials_count || 1} Document(s)
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <span className="font-semibold text-gray-700">
+                                    {st.topics_count || 7} Topics
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                    (st.average_mastery || 60) >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                                    (st.average_mastery || 60) >= 50 ? 'bg-amber-100 text-amber-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {st.average_mastery || 60}%
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEyeModal(st.id)}
+                                    title={`View materials and topics for ${st.name}`}
+                                    className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#003B1B] rounded-lg border border-emerald-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Eye className="w-4 h-4 text-emerald-700" />
+                                    <span className="text-[11px] font-bold">Summary</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* 3. INTERACTIVE COHORT ANALYTICS GRAPH (0–100% Criteria) */}
+                  <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-full border border-blue-200">
+                            Telemetry Graph
+                          </span>
+                          <h2 className="text-base font-bold text-gray-900">Cohort Student Topic Progress (0–100%)</h2>
                         </div>
-                        <div className="flex justify-between text-[10px] text-gray-500">
-                          <span className="text-red-600 font-semibold">{t.critical_students_count} Critical (&lt;50%)</span>
-                          <span className="text-amber-600 font-semibold">{t.review_students_count} Review Needed (50-79%)</span>
-                          <span className="text-emerald-600 font-semibold">{t.mastered_students_count} Mastered (≥80%)</span>
-                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          X-axis: Students · Y-axis: 0–100% Criteria. Hover/Tap any dot on the growth lines to inspect student name, topic, and performance.
+                        </p>
                       </div>
-
-                      {/* Recommended Instructor Action */}
-                      <div className="p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-200/60 text-xs text-emerald-950 flex items-start gap-2">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>Pedagogical Recommendation:</strong> {t.recommended_instructor_action}</span>
+                      <div className="flex items-center gap-4 text-xs font-medium">
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500"></span> Mastered (≥80%)</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-500"></span> Needs Review (50-79%)</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500"></span> Critical Gap (&lt;50%)</span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* At-Risk Students & Live Diagnostic Activity */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
-                  <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-                    Scholars Requiring Remedial Attention
-                  </h2>
-                  <div className="space-y-3">
-                    {(teacherData?.at_risk_students || []).map((s, idx) => (
-                      <div key={idx} className="p-3.5 rounded-xl border border-gray-200 flex items-center justify-between text-xs hover:bg-gray-50">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-900">{s.name}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              s.risk_level === 'High Risk' ? 'bg-red-100 text-red-800' :
-                              s.risk_level === 'Moderate Risk' ? 'bg-amber-100 text-amber-800' :
-                              'bg-emerald-100 text-emerald-800'
-                            }`}>
-                              {s.risk_level}
+                    {/* Interactive SVG Chart */}
+                    <div className="relative pt-6 pb-2">
+                      <div className="w-full h-72 relative">
+                        {/* Y-Axis Grid Lines & Labels */}
+                        {[100, 80, 60, 40, 20, 0].map((lvl, lIdx) => {
+                          const topPct = `${100 - lvl}%`;
+                          return (
+                            <div key={lvl} className="absolute left-0 right-0 flex items-center" style={{ top: topPct }}>
+                              <span className="w-10 text-[10px] font-mono text-gray-400 text-right pr-2 shrink-0">{lvl}%</span>
+                              <div className="flex-1 border-b border-gray-100"></div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Interactive Data Plot Area */}
+                        <div className="absolute left-12 right-4 top-0 bottom-0">
+                          {(() => {
+                            const studentsToPlot = cohortGraphData?.students || teacherStudentsList.slice(0, 8);
+                            const n = Math.max(studentsToPlot.length, 1);
+                            const step = 100 / (n + 1);
+
+                            // Calculate polygon points for connecting lines
+                            const avgPoints = studentsToPlot.map((st, idx) => {
+                              const x = (idx + 1) * step;
+                              const y = 100 - (st.average_score || 60);
+                              return `${x},${y}`;
+                            }).join(' ');
+
+                            return (
+                              <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+                                {/* Connecting Average Line */}
+                                <polyline
+                                  fill="none"
+                                  stroke="#10B981"
+                                  strokeWidth="1.5"
+                                  strokeDasharray="2,2"
+                                  points={avgPoints}
+                                />
+
+                                {/* Interactive Data Dots */}
+                                {studentsToPlot.map((st, idx) => {
+                                  const x = (idx + 1) * step;
+                                  const topics = st.topics || [
+                                    { topic: "Linear Systems", score: st.highest_score || 85 },
+                                    { topic: "Matrix Rank & Vector Pivot", score: st.lowest_score || 38 }
+                                  ];
+
+                                  return topics.map((t, tIdx) => {
+                                    const y = 100 - (t.score || 50);
+                                    const dotColor = t.score >= 80 ? '#10B981' : (t.score >= 50 ? '#F59E0B' : '#EF4444');
+
+                                    return (
+                                      <g key={`${idx}-${tIdx}`}>
+                                        <circle
+                                          cx={x}
+                                          cy={y}
+                                          r="2.5"
+                                          fill={dotColor}
+                                          stroke="#FFFFFF"
+                                          strokeWidth="1"
+                                          className="cursor-pointer hover:scale-150 transition-transform"
+                                          onMouseEnter={() => setActiveGraphDot({
+                                            student_name: st.student_name || st.name,
+                                            topic: t.topic,
+                                            score: t.score,
+                                            x: x,
+                                            y: y
+                                          })}
+                                          onClick={() => setActiveGraphDot({
+                                            student_name: st.student_name || st.name,
+                                            topic: t.topic,
+                                            score: t.score,
+                                            x: x,
+                                            y: y
+                                          })}
+                                        />
+                                      </g>
+                                    );
+                                  });
+                                })}
+                              </svg>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* X-Axis Student Labels */}
+                      <div className="flex justify-between pl-12 pr-4 pt-3 border-t border-gray-200">
+                        {(cohortGraphData?.students || teacherStudentsList.slice(0, 8)).map((st, idx) => (
+                          <div key={idx} className="text-center">
+                            <span className="text-[10px] font-bold text-gray-700 block">
+                              {st.student_label || `Student ${idx + 1}`}
+                            </span>
+                            <span className="text-[9px] text-gray-400 block truncate max-w-[60px]">
+                              {(st.student_name || st.name)?.split(' ')[0]}
                             </span>
                           </div>
-                          <span className="text-gray-500 font-mono text-[11px] block">{s.email}</span>
-                          {s.critical_topics?.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {s.critical_topics.map((ct, cIdx) => (
-                                <span key={cIdx} className="bg-red-50 text-red-700 border border-red-200 text-[10px] px-1.5 py-0.5 rounded">
-                                  {ct}
-                                </span>
+                        ))}
+                      </div>
+
+                      {/* Tooltip Card on tap/hover */}
+                      {activeGraphDot && (
+                        <div className="mt-4 p-4 rounded-xl bg-[#0A0D0E] text-white border border-emerald-500/40 shadow-xl flex items-center justify-between animate-fadeIn">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-emerald-400">Selected Telemetry Dot</span>
+                            <h4 className="text-sm font-bold text-white">{activeGraphDot.student_name}</h4>
+                            <p className="text-xs text-gray-300 mt-0.5">Topic: <strong className="text-white">{activeGraphDot.topic}</strong></p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`text-2xl font-black font-mono ${
+                              activeGraphDot.score >= 80 ? 'text-emerald-400' :
+                              activeGraphDot.score >= 50 ? 'text-amber-400' : 'text-red-400'
+                            }`}>
+                              {activeGraphDot.score}%
+                            </span>
+                            <span className="text-[10px] text-gray-400 block font-semibold">Mastery Performance</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4. WEAKER STUDENTS SECTION (Score < 50% & Topic Occurred) */}
+                  <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase bg-red-100 text-red-900 px-2.5 py-0.5 rounded-full border border-red-200">
+                            Immediate Remediation Required
+                          </span>
+                          <h2 className="text-base font-bold text-gray-900">Weaker Students & Specific Gap Topics (&lt;50%)</h2>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Surfaced separately so faculty can assign focused drills or dedicate lecture time to the exact bottleneck concepts.
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-red-700 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 shrink-0">
+                        {weakerStudentsList.length} At-Risk Incident(s)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {weakerStudentsList.length === 0 ? (
+                        <div className="col-span-full p-8 text-center bg-emerald-50/50 rounded-xl border border-emerald-200 text-emerald-900 text-xs font-semibold">
+                          🎉 Excellent! No students currently fall below the 50% mastery threshold.
+                        </div>
+                      ) : (
+                        weakerStudentsList.map((ws, idx) => (
+                          <div key={idx} className="p-4 rounded-xl border border-red-200 bg-red-50/30 space-y-2 hover:bg-white transition-all">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-gray-900 text-xs">{ws.name}</span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-red-100 text-red-800 border border-red-200">
+                                {ws.severity || 'Critical Deficit'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-700 font-semibold">Deficit Topic: <strong className="text-red-700">{ws.topic}</strong></span>
+                              <span className="font-mono font-bold text-red-600 text-sm">{ws.score}%</span>
+                            </div>
+                            <p className="text-[11px] text-gray-600 leading-relaxed italic bg-white p-2 rounded border border-red-100">
+                              "{ws.recommended_action || `Review foundational prerequisites on ${ws.topic}.`}"
+                            </p>
+                            <div className="pt-1 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const token = getToken();
+                                  const res = await fetch('/api/teacher/broadcast-drill', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify({ topic: ws.topic, message: `Instructor assigned targeted remedial drill for ${ws.topic}.` })
+                                  });
+                                  if (res.ok) {
+                                    showToast(`Remedial drill assigned to ${ws.name} on ${ws.topic}!`);
+                                  }
+                                }}
+                                className="px-3 py-1 bg-[#003B1B] hover:bg-emerald-900 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                              >
+                                Assign Drill
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ===================== TAB 2: CREATE ASSIGNMENT (QUIZ OR QUESTION PAPER) ===================== */}
+              {teacherActiveTab === 'create_assignment' && (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8 space-y-6 max-w-4xl mx-auto">
+                  <div className="border-b border-gray-100 pb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        AI-Grounded Assignment Creator
+                      </span>
+                      <h2 className="text-xl font-black text-gray-900">Create Academic Assignment Grounded in Course Material</h2>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Upload any syllabus chapter, lecture notes, or past question paper. Our model extracts concepts and prepares a 30-MCQ Quiz or 10-Question Paper grounded strictly in the source text.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleCreateAssignment} className="space-y-5 text-left text-xs">
+                    {/* Toggle: Quiz vs Question Paper */}
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-2 uppercase tracking-wider">
+                        Assignment Format Toggle
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setAssignmentForm({ ...assignmentForm, assignment_type: 'quiz' })}
+                          className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                            assignmentForm.assignment_type === 'quiz'
+                              ? 'bg-emerald-50/80 border-[#003B1B] ring-2 ring-[#003B1B]/20 shadow-xs'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-sm text-gray-900">Adaptive Quiz</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">30 Mins</span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1 font-normal">
+                            <strong>30 MCQs</strong> (Easy to Medium). Auto-graded instantaneously against calibrated answer keys.
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setAssignmentForm({ ...assignmentForm, assignment_type: 'question_paper' })}
+                          className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                            assignmentForm.assignment_type === 'question_paper'
+                              ? 'bg-emerald-50/80 border-[#003B1B] ring-2 ring-[#003B1B]/20 shadow-xs'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-sm text-gray-900">Question Paper</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">45 Mins</span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1 font-normal">
+                            <strong>10 Analytical Questions</strong> (Easy to Medium, 10 marks each = 100 marks total).
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Assignment Title & Topic */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-gray-700 block mb-1">Assignment Title *</label>
+                        <input
+                          type="text"
+                          required
+                          value={assignmentForm.title}
+                          onChange={(e) => setAssignmentForm({ ...assignmentForm, title: e.target.value })}
+                          placeholder="e.g. Unit 2 Comprehensive Rank-Nullity Assessment"
+                          className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:ring-1 focus:ring-black"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-700 block mb-1">Target Topic *</label>
+                        <input
+                          type="text"
+                          required
+                          value={assignmentForm.topic}
+                          onChange={(e) => setAssignmentForm({ ...assignmentForm, topic: e.target.value })}
+                          placeholder="e.g. Matrix Rank & Vector Pivot"
+                          className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:ring-1 focus:ring-black"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Scheduled Date & Time Window */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                      <div>
+                        <label className="text-xs font-bold text-gray-700 block mb-1">Scheduled Start Date & Time *</label>
+                        <input
+                          type="datetime-local"
+                          required
+                          value={assignmentForm.start_time}
+                          onChange={(e) => setAssignmentForm({ ...assignmentForm, start_time: e.target.value })}
+                          className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs"
+                        />
+                        <span className="text-[10px] text-gray-500 mt-1 block">Students cannot attempt before this time.</span>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-700 block mb-1">Scheduled End Date & Time (Close Time) *</label>
+                        <input
+                          type="datetime-local"
+                          required
+                          value={assignmentForm.end_time}
+                          onChange={(e) => setAssignmentForm({ ...assignmentForm, end_time: e.target.value })}
+                          className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs"
+                        />
+                        <span className="text-[10px] text-gray-500 mt-1 block">Assignment automatically expires after this time.</span>
+                      </div>
+                    </div>
+
+                    {/* Faculty Name & Subject */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-gray-700 block mb-1">Faculty Name (Optional)</label>
+                        <input
+                          type="text"
+                          value={assignmentForm.faculty_name}
+                          onChange={(e) => setAssignmentForm({ ...assignmentForm, faculty_name: e.target.value })}
+                          placeholder="e.g. Dr. Elena Rostova"
+                          className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-700 block mb-1">Subject (Optional)</label>
+                        <input
+                          type="text"
+                          value={assignmentForm.subject}
+                          onChange={(e) => setAssignmentForm({ ...assignmentForm, subject: e.target.value })}
+                          placeholder="e.g. Foundational STEM & Multivariable Systems"
+                          className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Document Upload */}
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">Upload Grounding Document (PDF / DOCX / TXT / MD) *</label>
+                      <div className="p-5 border-2 border-dashed border-gray-300 rounded-xl text-center bg-gray-50 hover:bg-emerald-50/30 hover:border-emerald-500 transition-colors">
+                        <input
+                          type="file"
+                          id="teacher-doc-upload"
+                          accept=".pdf,.docx,.txt,.md"
+                          onChange={(e) => setAssignmentForm({ ...assignmentForm, file: e.target.files?.[0] || null })}
+                          className="hidden"
+                        />
+                        <label htmlFor="teacher-doc-upload" className="cursor-pointer block space-y-1">
+                          <Upload className="w-6 h-6 text-gray-400 mx-auto" />
+                          <span className="text-xs font-bold text-emerald-800 block">
+                            {assignmentForm.file ? assignmentForm.file.name : "Click to select chapter, syllabus, or past paper document"}
+                          </span>
+                          <span className="text-[10px] text-gray-400 block">
+                            {assignmentForm.file ? `${Math.round(assignmentForm.file.size / 1024)} KB · Ready for AI Grounding` : "Supports PDF, DOCX, TXT, MD up to 25 MB"}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        disabled={assignmentCreating}
+                        className="w-full py-3 bg-[#003B1B] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {assignmentCreating ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                            <span>Grounding Questions in Uploaded Document & Publishing to All Students...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4 text-emerald-400" />
+                            <span>Generate & Publish to All Students in Real Time</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* ===================== TAB 3: STUDENT SUBMISSIONS & ATTEMPTS ===================== */}
+              {teacherActiveTab === 'submissions' && (
+                <div className="space-y-6">
+                  {/* Assignment Selector & Filter Bar */}
+                  <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-base font-bold text-gray-900">Student Attempts & Evaluation Telemetry</h2>
+                      <p className="text-xs text-gray-500 mt-0.5">Filter by Highest to Lowest (%) or Lowest to Highest (%) score.</p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {/* Assignment Selector */}
+                      <select
+                        onChange={(e) => {
+                          const aid = parseInt(e.target.value);
+                          const target = teacherAssignmentsList.find(a => a.id === aid);
+                          if (target) handleViewSubmissions(target, submissionsSort);
+                        }}
+                        value={selectedAssignmentForSubmissions?.id || ''}
+                        className="p-2 text-xs bg-gray-50 border border-gray-200 rounded-xl font-bold"
+                      >
+                        <option value="">Select Assignment to View Submissions</option>
+                        {teacherAssignmentsList.map(a => (
+                          <option key={a.id} value={a.id}>
+                            {a.title} ({a.assignment_type.toUpperCase()} · {a.submissions_count} attempts)
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Sort Filter: High-to-Low vs Low-to-High */}
+                      {selectedAssignmentForSubmissions && (
+                        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+                          <button
+                            type="button"
+                            onClick={() => handleViewSubmissions(selectedAssignmentForSubmissions, 'high_to_low')}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              submissionsSort === 'high_to_low' ? 'bg-[#003B1B] text-white shadow-xs' : 'text-gray-600 hover:text-black'
+                            }`}
+                          >
+                            Highest % First
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleViewSubmissions(selectedAssignmentForSubmissions, 'low_to_high')}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              submissionsSort === 'low_to_high' ? 'bg-[#003B1B] text-white shadow-xs' : 'text-gray-600 hover:text-black'
+                            }`}
+                          >
+                            Lowest % First
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Submissions Table */}
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                          <tr>
+                            <th className="py-3 px-4">S.No</th>
+                            <th className="py-3 px-4">Student Name</th>
+                            <th className="py-3 px-4">Email</th>
+                            <th className="py-3 px-4">Percentage Score</th>
+                            <th className="py-3 px-4">Attempt Time / Date</th>
+                            <th className="py-3 px-4">Time Spent</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {!assignmentSubmissionsData || assignmentSubmissionsData.submissions?.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-12 text-center text-gray-400">
+                                {teacherAssignmentsList.length === 0
+                                  ? "No assignments created yet. Create a Quiz or Question Paper to view student submissions."
+                                  : (selectedAssignmentForSubmissions
+                                      ? "No students have attempted this assignment yet."
+                                      : "Select an assignment from the dropdown above to view student submission records.")
+                                }
+                              </td>
+                            </tr>
+                          ) : (
+                            assignmentSubmissionsData.submissions.map((sub, idx) => (
+                              <tr key={sub.id || idx} className="hover:bg-emerald-50/40 transition-colors">
+                                <td className="py-3 px-4 font-mono font-bold text-gray-500">{sub.s_no || idx + 1}</td>
+                                <td className="py-3 px-4 font-bold text-gray-900">{sub.student_name}</td>
+                                <td className="py-3 px-4 font-mono text-gray-600">{sub.student_email}</td>
+                                <td className="py-3 px-4">
+                                  <span className={`px-2.5 py-1 rounded text-xs font-black font-mono ${
+                                    sub.percentage >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                                    sub.percentage >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {sub.percentage}% ({sub.score}/{sub.total_marks})
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 font-mono text-gray-500">{sub.submitted_at}</td>
+                                <td className="py-3 px-4 font-semibold text-gray-700">{sub.time_spent_formatted || `${sub.time_spent_seconds}s`}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Analytics Summary below Table */}
+                    {assignmentSubmissionsData?.analytics && (
+                      <div className="p-4 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center justify-between text-xs gap-3">
+                        <span className="text-gray-600">Total Attempts: <strong>{assignmentSubmissionsData.total_attempted}</strong></span>
+                        <span className="text-gray-600">Average Percentage: <strong className="text-emerald-700">{assignmentSubmissionsData.analytics.average_percentage}%</strong></span>
+                        <span className="text-gray-600">Highest Score: <strong className="text-emerald-700">{assignmentSubmissionsData.analytics.highest_percentage}%</strong></span>
+                        <span className="text-gray-600">Lowest Score: <strong className="text-red-700">{assignmentSubmissionsData.analytics.lowest_percentage}%</strong></span>
+                        <span className="text-gray-600">Pass Rate (≥50%): <strong className="text-blue-700">{assignmentSubmissionsData.analytics.pass_rate_pct}%</strong></span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ===================== TAB 4: ADMIN HISTORY & AUDIT TRAIL ===================== */}
+              {teacherActiveTab === 'history' && (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8 space-y-6">
+                  <div className="border-b border-gray-100 pb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase bg-purple-100 text-purple-900 px-2.5 py-0.5 rounded-full border border-purple-200">
+                        Admin Audit Log
+                      </span>
+                      <h2 className="text-lg font-bold text-gray-900">Separate Admin History & Real-Time Action Log</h2>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Chronological ledger tracking quizzes created, question papers ready, and student submissions in real time. Zero simulated data.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {adminHistoryList.length === 0 ? (
+                      <div className="p-8 text-center text-gray-400 text-xs">No admin history records logged yet.</div>
+                    ) : (
+                      adminHistoryList.map((h, idx) => (
+                        <div key={h.id || idx} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 hover:bg-white transition-all space-y-1 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-gray-900 flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                              <span>{h.title}</span>
+                            </span>
+                            <span className="text-[10px] font-mono text-gray-400">{h.created_at}</span>
+                          </div>
+                          <p className="text-gray-600 pl-4">{h.details}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ===================== FLOATING EYE MODAL CARD (STUDENT MATERIAL SUMMARY) ===================== */}
+              {eyeModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+                  <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-2xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded">
+                          Student Material Inspection
+                        </span>
+                        <h3 className="text-lg font-bold text-gray-900 mt-1">
+                          {selectedStudentForEyeModal?.student_name || "Student Materials Summary"}
+                        </h3>
+                        <p className="text-xs text-gray-500 font-mono">
+                          {selectedStudentForEyeModal?.student_email}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setEyeModalOpen(false); setSelectedStudentForEyeModal(null); }}
+                        className="p-1.5 text-gray-400 hover:text-black rounded-lg hover:bg-gray-100 cursor-pointer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {eyeModalLoading ? (
+                      <div className="py-12 text-center text-xs text-gray-500">Loading student uploaded materials and active topics...</div>
+                    ) : (
+                      <div className="space-y-4 text-xs">
+                        {/* Summary Metrics */}
+                        <div className="grid grid-cols-3 gap-3 text-center">
+                          <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Total Documents</span>
+                            <span className="text-lg font-bold text-gray-900">{selectedStudentForEyeModal?.total_documents || 1}</span>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Total Pages</span>
+                            <span className="text-lg font-bold text-gray-900">{selectedStudentForEyeModal?.total_pages || 23}</span>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Active Gap Topics</span>
+                            <span className="text-lg font-bold text-emerald-700">{selectedStudentForEyeModal?.active_topics?.length || 7}</span>
+                          </div>
+                        </div>
+
+                        {/* List of Documents Uploaded */}
+                        <div>
+                          <h4 className="font-bold text-gray-900 mb-2">Uploaded Materials Summary & Topics in Use:</h4>
+                          <div className="space-y-2.5">
+                            {(selectedStudentForEyeModal?.materials || []).map((m, idx) => (
+                              <div key={idx} className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                                    <FileText className="w-4 h-4 text-emerald-700" />
+                                    <span>{m.title}</span>
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-mono">{m.uploaded_at}</span>
+                                </div>
+                                <div className="text-[11px] text-gray-600 flex items-center gap-3">
+                                  <span>Subject: <strong>{m.subject}</strong></span>
+                                  <span>•</span>
+                                  <span>Pages: <strong>{m.page_count}</strong></span>
+                                  <span>•</span>
+                                  <span>Size: <strong>{Math.round(m.file_size / 1024)} KB</strong></span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Topics Extracted & In Use:</span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {(m.topics_list || []).map((top, tIdx) => (
+                                      <span key={tIdx} className="bg-white border border-gray-200 px-2 py-0.5 rounded text-[10px] font-medium text-gray-800">
+                                        {top}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Active Knowledge Gaps */}
+                        {selectedStudentForEyeModal?.active_topics?.length > 0 && (
+                          <div>
+                            <h4 className="font-bold text-gray-900 mb-2">Active Topic Mastery Scores:</h4>
+                            <div className="grid grid-cols-2 gap-2">
+                              {selectedStudentForEyeModal.active_topics.map((top, tIdx) => (
+                                <div key={tIdx} className="p-2 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                                  <span className="font-medium text-gray-800 truncate pr-2">{top.topic}</span>
+                                  <span className={`px-1.5 py-0.5 rounded font-mono font-bold text-[10px] ${
+                                    top.score >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                                    top.score >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {top.score}%
+                                  </span>
+                                </div>
                               ))}
                             </div>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <span className="text-lg font-black text-gray-900 font-mono">{s.average_mastery}%</span>
-                          <span className="text-[10px] text-gray-400 block">Overall Mastery</span>
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
-
-                {/* Recent Diagnostic Activity Stream across Class */}
-                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
-                  <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-                    Live Cohort Diagnostic Stream
-                  </h2>
-                  <div className="space-y-3">
-                    {(teacherData?.recent_class_activity || []).map((sess, idx) => (
-                      <div key={idx} className="p-3.5 rounded-xl border border-gray-200 flex items-center justify-between text-xs bg-gray-50/50">
-                        <div>
-                          <p className="font-bold text-gray-900">{sess.student_name}</p>
-                          <p className="text-gray-600 text-[11px]">{sess.topic}</p>
-                          <span className="text-[10px] text-gray-400">{sess.completed_at}</span>
-                        </div>
-                        <div className="text-right font-mono">
-                          <span className={`text-base font-black ${sess.score >= 80 ? 'text-emerald-600' : sess.score >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
-                            {sess.score}%
-                          </span>
-                          <span className="text-[10px] text-gray-400 block">Diagnostic Score</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           ) : (
             <>
           {/* TAB 1: OVERVIEW DASHBOARD */}
           {activeTab === 'overview' && (
             <div className="max-w-7xl mx-auto space-y-8">
+
+              {/* REAL-TIME FACULTY ASSIGNMENTS STRIP (WITH NOTIFICATION BADGE) */}
+              {studentAssignmentsList.length > 0 && (
+                <div className="bg-white rounded-3xl border border-emerald-300 p-6 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                          Course Assignments Assigned by Faculty
+                        </span>
+                        {pendingStudentAssignmentsCount > 0 && (
+                          <span className="text-[10px] font-black bg-red-500 text-white px-2 py-0.5 rounded-full animate-bounce">
+                            {pendingStudentAssignmentsCount} New
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="text-lg font-bold text-gray-900 mt-1">Grounding Quizzes & Question Papers</h2>
+                    </div>
+                    <span className="text-xs text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 font-medium">
+                      Strict scheduled attempt window enforced
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {studentAssignmentsList.map((a, idx) => (
+                      <div key={a.id || idx} className="p-4 rounded-2xl border border-gray-200 bg-gray-50/50 hover:bg-white hover:border-emerald-400 transition-all space-y-2.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-900 text-sm">{a.title}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                            a.assignment_type === 'quiz' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {a.assignment_type === 'quiz' ? 'Quiz (30 MCQs · 30m)' : 'Question Paper (10 Qs · 45m)'}
+                          </span>
+                        </div>
+
+                        <p className="text-gray-600">
+                          Topic: <strong className="text-gray-900">{a.topic}</strong> · Faculty: <strong>{a.faculty_name}</strong>
+                        </p>
+
+                        <div className="p-2 rounded-lg bg-white border border-gray-200 flex items-center justify-between text-[11px] font-mono">
+                          <span className="text-gray-500">Attempt Window:</span>
+                          <span className={`font-bold ${a.can_attempt ? 'text-emerald-700' : (a.is_upcoming ? 'text-amber-700' : 'text-gray-500')}`}>
+                            {a.time_status_label}
+                          </span>
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+                          {a.has_submitted ? (
+                            <span className="text-emerald-700 font-bold flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span>Completed · Score: {a.submission?.percentage}% ({a.submission?.score}/{a.submission?.total_marks})</span>
+                            </span>
+                          ) : a.can_attempt ? (
+                            <button
+                              type="button"
+                              onClick={() => handleStartStudentAssignment(a)}
+                              className="px-4 py-2 bg-[#003B1B] hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-transform hover:scale-[1.02]"
+                            >
+                              <Play className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Start Assignment ({a.duration_minutes} Mins)</span>
+                            </button>
+                          ) : a.is_upcoming ? (
+                            <span className="text-amber-700 font-semibold bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
+                              🔒 Opens at scheduled time
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 font-semibold bg-gray-100 px-2.5 py-1 rounded-md">
+                              Assignment Expired
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {/* Bespoke Luxury Welcome Card */}
               {(() => {
@@ -4206,7 +4965,194 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         </div>
       )}
 
-      {/* ===================== MOBILE NAVIGATION SLIDEOUT DRAWER ===================== */}
+      {/* ===================== STUDENT ASSIGNMENT ATTEMPT RUNNER MODAL ===================== */}
+      {studentAssignmentModalOpen && activeStudentAssignment && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-4xl w-full h-[90vh] flex flex-col overflow-hidden">
+            {/* Modal Top Header */}
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-[#FAF8F5] shrink-0">
+              <div>
+                <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded">
+                  {activeStudentAssignment.assignment_type === 'quiz' ? 'Adaptive Quiz (30 MCQs)' : 'Question Paper (10 Questions)'}
+                </span>
+                <h2 className="text-base font-extrabold text-gray-900 mt-1">{activeStudentAssignment.title}</h2>
+                <p className="text-xs text-gray-500">Topic: <strong className="text-black">{activeStudentAssignment.topic}</strong> · Faculty: {activeStudentAssignment.faculty_name}</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Countdown Timer */}
+                {!studentAssignmentResult && (
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs font-bold border shadow-xs ${
+                    studentAssignmentTimer < 180 ? 'bg-red-50 text-red-700 border-red-200 animate-pulse' : 'bg-white text-gray-800 border-gray-200'
+                  }`}>
+                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{Math.floor(studentAssignmentTimer / 60)}:{String(studentAssignmentTimer % 60).padStart(2, '0')}</span>
+                  </div>
+                )}
+
+                {!studentAssignmentResult && (
+                  <button
+                    type="button"
+                    onClick={handleSubmitStudentAssignment}
+                    disabled={studentAssignmentSubmitting}
+                    className="px-4 py-2 bg-[#003B1B] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {studentAssignmentSubmitting ? 'Evaluating...' : 'Submit & Grade'}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!studentAssignmentResult && !window.confirm('Exit assignment? Your progress in this attempt will be saved.')) return;
+                    setStudentAssignmentModalOpen(false);
+                    setActiveStudentAssignment(null);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-black rounded-lg hover:bg-gray-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar text-xs">
+              {studentAssignmentResult ? (
+                /* Results Screen */
+                <div className="space-y-6 animate-fadeIn">
+                  <div className="p-6 bg-emerald-50/80 rounded-2xl border border-emerald-200 text-center space-y-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-200 text-emerald-950 px-3 py-1 rounded-full">
+                      Assessment Evaluation Complete
+                    </span>
+                    <h3 className="text-2xl font-black text-gray-900">
+                      Score: {studentAssignmentResult.percentage}% ({studentAssignmentResult.score}/{studentAssignmentResult.total_marks})
+                    </h3>
+                    <p className="text-xs text-gray-600 max-w-md mx-auto">
+                      Telemetry logged to instructor cohort dashboard in real time. Your topic mastery has been dynamically re-calibrated.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setStudentAssignmentModalOpen(false); setActiveStudentAssignment(null); }}
+                      className="px-6 py-2.5 bg-[#003B1B] text-white font-bold rounded-xl text-xs hover:bg-emerald-900 transition-colors shadow-sm cursor-pointer"
+                    >
+                      Return to Workspace
+                    </button>
+                  </div>
+
+                  {/* Question Breakdown */}
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-sm text-gray-900">Question Evaluation Breakdown:</h4>
+                    {(studentAssignmentResult.review || []).map((rev, idx) => (
+                      <div key={idx} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-900">Q{idx + 1}: {rev.question}</span>
+                          {rev.is_correct !== undefined ? (
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${rev.is_correct ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                              {rev.is_correct ? 'Correct (+1)' : 'Incorrect (0)'}
+                            </span>
+                          ) : (
+                            <span className="font-mono font-bold text-emerald-700">
+                              {rev.marks_awarded} / {rev.marks_possible} Marks
+                            </span>
+                          )}
+                        </div>
+                        {rev.explanation && (
+                          <p className="text-gray-700 bg-white p-2.5 rounded border border-gray-200 leading-relaxed">
+                            <strong>Explanation: </strong>{rev.explanation}
+                          </p>
+                        )}
+                        {rev.citation && (
+                          <p className="text-[10px] font-mono text-emerald-800">Ref: {rev.citation}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Question Paper / Quiz Form */
+                <div className="space-y-6">
+                  {studentAssignmentQuestions.map((q, idx) => (
+                    <div key={q.id || idx} className="p-5 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded">
+                          Question {idx + 1} of {studentAssignmentQuestions.length}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-mono">
+                          {q.marks ? `${q.marks} Marks` : '1 Mark'} · {q.difficulty}
+                        </span>
+                      </div>
+
+                      <p className="text-sm font-bold text-gray-900 leading-relaxed">
+                        {q.question}
+                      </p>
+
+                      {/* Options for Quiz */}
+                      {activeStudentAssignment.assignment_type === 'quiz' && q.options && (
+                        <div className="space-y-2 pt-1">
+                          {q.options.map((opt, oIdx) => {
+                            const isSelected = studentAssignmentAnswers[String(q.id)] === oIdx;
+                            return (
+                              <button
+                                key={oIdx}
+                                type="button"
+                                onClick={() => setStudentAssignmentAnswers({ ...studentAssignmentAnswers, [String(q.id)]: oIdx })}
+                                className={`w-full p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-emerald-50 border-emerald-600 text-emerald-950 ring-1 ring-emerald-500 font-bold'
+                                    : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 font-medium'
+                                }`}
+                              >
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                                  isSelected ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600'
+                                }`}>
+                                  {String.fromCharCode(65 + oIdx)}
+                                </span>
+                                <span className="flex-1">{opt}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Text Response for Question Paper */}
+                      {activeStudentAssignment.assignment_type !== 'quiz' && (
+                        <div className="pt-1">
+                          <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Your Written Response:</label>
+                          <textarea
+                            rows={4}
+                            value={studentAssignmentAnswers[String(q.id)] || ''}
+                            onChange={(e) => setStudentAssignmentAnswers({ ...studentAssignmentAnswers, [String(q.id)]: e.target.value })}
+                            placeholder="Type your derivation, mathematical proofs, or detailed conceptual explanation here..."
+                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-xs focus:bg-white focus:ring-1 focus:ring-black leading-relaxed"
+                          />
+                        </div>
+                      )}
+
+                      {q.citation && (
+                        <div className="pt-1 border-t border-gray-100 text-[10px] text-gray-400 font-mono">
+                          Source Grounding: {q.citation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSubmitStudentAssignment}
+                      disabled={studentAssignmentSubmitting}
+                      className="px-6 py-3 bg-[#003B1B] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {studentAssignmentSubmitting ? 'Evaluating Submission...' : 'Complete & Submit Assignment'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 md:hidden flex">
           <div className="w-72 bg-[#0A0D0E] text-white h-full flex flex-col justify-between p-4 border-r border-[#22282C] animate-in slide-in-from-left duration-200">
