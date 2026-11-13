@@ -161,29 +161,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
   const [assistantAttachment, setAssistantAttachment] = useState(null);
   const fullAssistantFileInputRef = useRef(null);
 
-  const [assistantMessages, setAssistantMessages] = useState([
-    {
-      role: 'assistant',
-      text: `Hi ${currentUser?.name || 'Student'}, I'm Shubh AI Assistant, your personal helper. How can I help you today?`
-    }
-  ]);
-
-  // Synchronize greeting with registered user name dynamically
-  useEffect(() => {
-    if (currentUser?.name) {
-      setAssistantMessages(prev => {
-        if (prev.length <= 1) {
-          return [
-            {
-              role: 'assistant',
-              text: `Hi ${currentUser.name}, I'm Shubh AI Assistant, your personal helper. How can I help you today?`
-            }
-          ];
-        }
-        return prev;
-      });
-    }
-  }, [currentUser?.name]);
+  const [assistantMessages, setAssistantMessages] = useState([]);
 
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantLoading, setAssistantLoading] = useState(false);
@@ -354,14 +332,16 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
       }
 
       // 11. Teacher Cohort Overview
-      try {
-        const teaRes = await fetch('/api/teacher/overview', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (teaRes.ok) {
-          const teaData = await teaRes.json();
-          setTeacherData(teaData);
+      if (isTeacher) {
+        try {
+          const teaRes = await fetch('/api/teacher/overview', { headers: { 'Authorization': `Bearer ${token}` } });
+          if (teaRes.ok) {
+            const teaData = await teaRes.json();
+            setTeacherData(teaData);
+          }
+        } catch (teaErr) {
+          console.error('Teacher data error:', teaErr);
         }
-      } catch (teaErr) {
-        console.error('Teacher data error:', teaErr);
       }
 
       // 12. Scheduled Timed Revision Sessions
@@ -4036,7 +4016,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                           className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-gray-50"
                         >
                           <option value="">All Uploaded Course Documents</option>
-                          {documents && documents.map((doc) => (
+                          {documentsList && documentsList.map((doc) => (
                             <option key={doc.id} value={doc.id}>{doc.title} ({doc.doc_type})</option>
                           ))}
                         </select>
@@ -4965,17 +4945,65 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                   <div className="w-9 h-9 rounded-xl bg-[#0A0D0E] text-emerald-300 flex items-center justify-center shadow-xs">
                     <Sparkles className="w-4 h-4 text-emerald-400" />
                   </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-gray-900">Shubh AI Assistant</h2>
-                    <p className="text-[11px] text-gray-500 font-medium">
-                      Personalized Study & Concept Companion
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-gray-900">Shubh AI</h2>
+                    <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Agent
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* Chat Message Scroll Area */}
               <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar bg-[#FAF9F7]">
+                {assistantMessages.length === 0 && (
+                  <div className="max-w-xl mx-auto py-8 space-y-4">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">
+                      Autonomous Agent Direct Actions
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        onClick={() => handleSendMessage("Analyze my active curriculum and identify critical knowledge gaps with root causes.")}
+                        className="p-4 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-2xl text-left transition-all shadow-xs group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Zap className="w-4 h-4 text-amber-500" />
+                          <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Run Gap Diagnostics</span>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => handleSendMessage("Synthesize an adaptive 5-day revision plan prioritizing my weakest prerequisite topics.")}
+                        className="p-4 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-2xl text-left transition-all shadow-xs group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Calendar className="w-4 h-4 text-emerald-600" />
+                          <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Compile Remedial Revision Plan</span>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => handleSendMessage("Generate a visual concept flowchart linking foundational prerequisites to advanced topics using Mermaid syntax.")}
+                        className="p-4 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-2xl text-left transition-all shadow-xs group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Layers className="w-4 h-4 text-indigo-500" />
+                          <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Build Concept Dependency Flowchart</span>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => handleSendMessage("Verify textbook and syllabus grounding citations for my current course materials.")}
+                        className="p-4 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-2xl text-left transition-all shadow-xs group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Search className="w-4 h-4 text-cyan-600" />
+                          <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Audit Course Citations</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {assistantMessages.map((msg, idx) => (
                   <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {msg.role === 'assistant' && (
