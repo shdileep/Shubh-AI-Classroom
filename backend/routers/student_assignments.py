@@ -28,15 +28,11 @@ def _check_time_window(start_time_str: str, end_time_str: str):
             return True, False, False, f"Active ({start_time_str} to {end_time_str})"
 
     if now < st:
-        return False, True, False, f"Scheduled (Opens {st.strftime('%b %d, %I:%M %p')})"
+        return False, True, False, f"Opens {st.strftime('%b %d, %I:%M %p')}"
     elif now > et:
-        return False, False, True, f"Closed (Expired on {et.strftime('%b %d, %I:%M %p')})"
+        return False, False, True, f"Closed {et.strftime('%b %d, %I:%M %p')}"
     else:
-        diff = et - now
-        hours_left = int(diff.total_seconds() // 3600)
-        mins_left = int((diff.total_seconds() % 3600) // 60)
-        time_rem = f"{hours_left}h {mins_left}m" if hours_left > 0 else f"{mins_left} mins"
-        return True, False, False, f"Active Now (Closes in {time_rem})"
+        return True, False, False, f"Due {et.strftime('%b %d at %I:%M %p')}"
 
 
 @router.get("")

@@ -16,12 +16,16 @@ import FlowchartViewer from './FlowchartViewer';
 import heroImg from '../assets/hero.png';
 
 export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, authToken }) {
+  // Robust teacher role detection (prevents role mismatches or student sidebar leak)
+  const isTeacher = currentUser?.role === 'teacher' || currentUser?.email === 'admin@aiready.ac.in';
+
   // Navigation State
   const [activeTab, setActiveTab] = useState('overview'); // overview, materials, topics, diagnostics, gaps, revision, practice, analytics, history, assistant, bookmarks, notes, settings
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
+  const mainScrollRef = useRef(null);
 
   // Global State
   const [loading, setLoading] = useState(true);
@@ -58,8 +62,17 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
   const [revisionPlanData, setRevisionPlanData] = useState(null);
   const [revisionFilter, setRevisionFilter] = useState('all'); // all, pending, completed
 
-  // Practice State
-  const [practiceTopic, setPracticeTopic] = useState('Quadratic Roots & Nullity');
+  // Grounded Practice State (10 Questions × 10 Marks = 100 Marks Examination)
+  const [practiceTopic, setPracticeTopic] = useState('');
+  const [practiceTopicsList, setPracticeTopicsList] = useState([]);
+  const [practicePaperData, setPracticePaperData] = useState(null);
+  const [practiceActiveQuestionIndex, setPracticeActiveQuestionIndex] = useState(0);
+  const [practiceAnswers, setPracticeAnswers] = useState({});
+  const [practiceSavedQuestions, setPracticeSavedQuestions] = useState([]);
+  const [practicePaperLoading, setPracticePaperLoading] = useState(false);
+  const [practicePaperSubmitting, setPracticePaperSubmitting] = useState(false);
+  const [practiceDocTitle, setPracticeDocTitle] = useState('');
+  const [practiceHasDocuments, setPracticeHasDocuments] = useState(true);
   const [practiceDrills, setPracticeDrills] = useState([]);
   const [practiceAnswer, setPracticeAnswer] = useState(null);
   const [practiceSubmitted, setPracticeSubmitted] = useState(false);
@@ -108,12 +121,19 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
   const [assignmentSubmissionsData, setAssignmentSubmissionsData] = useState(null);
   const [submissionsSort, setSubmissionsSort] = useState('high_to_low'); // 'high_to_low' | 'low_to_high'
   const [adminHistoryList, setAdminHistoryList] = useState([]);
-  const [teacherActiveTab, setTeacherActiveTab] = useState('overview'); // 'overview', 'create_assignment', 'submissions', 'history'
+  const [teacherActiveTab, setTeacherActiveTab] = useState('overview'); // 'overview', 'students', 'progress_graph', 'weaker_students', 'create_assignment', 'submissions', 'history'
+
+  // Scroll to top automatically whenever teacher or student switches tabs
+  useEffect(() => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTop = 0;
+    }
+  }, [teacherActiveTab, activeTab]);
 
   // Teacher Assignment Creator Form State
   const [assignmentForm, setAssignmentForm] = useState({
     title: '',
-    topic: 'Matrix Rank & Vector Pivot',
+    topic: '',
     start_time: new Date().toISOString().slice(0, 16),
     end_time: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
     faculty_name: currentUser?.name || 'Faculty Administrator',
@@ -184,11 +204,11 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
   });
 
   // View Role strictly determined by authenticated user role (no student-to-teacher switching)
-  const [viewRole, setViewRole] = useState(() => (currentUser?.role === 'teacher' ? 'teacher' : 'student'));
+  const [viewRole, setViewRole] = useState(() => (isTeacher ? 'teacher' : 'student'));
 
   useEffect(() => {
-    setViewRole(currentUser?.role === 'teacher' ? 'teacher' : 'student');
-  }, [currentUser]);
+    setViewRole(isTeacher ? 'teacher' : 'student');
+  }, [currentUser, isTeacher]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -356,7 +376,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
       }
 
       // 13. Teacher-Specific Datasets (Students Directory, Graph, Weaker Students, Assignments, History)
-      if (currentUser?.role === 'teacher') {
+      if (isTeacher) {
         try {
           const [stRes, gRes, wRes, aRes, hRes] = await Promise.all([
             fetch('/api/teacher/students', { headers: { 'Authorization': `Bearer ${token}` } }),
@@ -400,6 +420,13 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         }
       } catch (saErr) {
         console.warn('Student assignments fetch error:', saErr);
+      }
+
+      // 15. Grounded Practice Topics
+      if (!isTeacher) {
+        try {
+          fetchPracticeTopics();
+        } catch (_) {}
       }
 
       setLoading(false);
@@ -503,7 +530,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
       showToast(`🎉 Assignment published! Grounded ${data.total_questions} questions in uploaded document.`);
       setAssignmentForm({
         title: '',
-        topic: 'Matrix Rank & Vector Pivot',
+        topic: '',
         start_time: new Date().toISOString().slice(0, 16),
         end_time: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
         faculty_name: currentUser?.name || 'Faculty Administrator',
@@ -530,7 +557,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         const ovData = await ovRes.json();
         setTeacherData(ovData);
       }
-      setTeacherActiveTab('assignments_submissions');
+      setTeacherActiveTab('submissions');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -550,7 +577,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
       if (res.ok) {
         const data = await res.json();
         setAssignmentSubmissionsData(data);
-        setTeacherActiveTab('assignments_submissions');
+        setTeacherActiveTab('submissions');
       }
     } catch (e) {
       showToast('Error loading submissions', 'error');
@@ -580,6 +607,11 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
       setStudentAssignmentTimerActive(true);
       setStudentAssignmentResult(null);
       setStudentAssignmentModalOpen(true);
+      try {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch (_) {}
     } catch (e) {
       showToast(e.message, 'error');
     }
@@ -612,6 +644,11 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
 
       setStudentAssignmentTimerActive(false);
       setStudentAssignmentResult(data);
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      } catch (_) {}
       showToast(`🎉 Assignment submitted! Score: ${data.percentage}% (${data.score}/${data.total_marks})`);
 
       // Refresh student assignments & dashboard
@@ -736,6 +773,11 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         setTestTimer(data.duration_minutes * 60 || 900);
         setTimerRunning(true);
         setActiveTab('diagnostics');
+        try {
+          if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        } catch (_) {}
       }
     } catch (err) {
       showToast('Error generating assessment.', 'error');
@@ -750,6 +792,11 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
     const token = getToken();
     setSubmittingTest(true);
     setTimerRunning(false);
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    } catch (_) {}
 
     try {
       const res = await fetch('/api/assessments/submit', {
@@ -813,34 +860,128 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
     }
   };
 
-  // Launch Practice Drill
-  const handleLaunchPractice = async (topicName) => {
-    setPracticeTopic(topicName);
-    setPracticeAnswer(null);
-    setPracticeSubmitted(false);
-    setPracticeFeedback(null);
-    setActiveTab('practice');
-
+  // Grounded Practice: Fetch Real Topics from Uploaded Documents
+  const fetchPracticeTopics = async () => {
     const token = getToken();
     try {
-      const res = await fetch('/api/practice/generate', {
+      const res = await fetch('/api/practice/topics', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPracticeTopicsList(data.topics || []);
+        setPracticeDocTitle(data.document_title || '');
+        setPracticeHasDocuments(Boolean(data.has_documents));
+        
+        if (data.topics && data.topics.length > 0) {
+          const firstTopic = data.topics[0].topic;
+          setPracticeTopic(firstTopic);
+          loadPracticePaper(firstTopic);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching practice topics:', err);
+    }
+  };
+
+  // Grounded Practice: Load 10-Question Grounded Paper
+  const loadPracticePaper = async (topicName) => {
+    if (!topicName) return;
+    setPracticePaperLoading(true);
+    setPracticeTopic(topicName);
+    const token = getToken();
+    try {
+      const res = await fetch(`/api/practice/paper?topic=${encodeURIComponent(topicName)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPracticePaperData(data);
+        setPracticeActiveQuestionIndex(0);
+        
+        if (data.has_submitted && data.submission) {
+          setPracticeAnswers(data.submission.answers || {});
+          setPracticeSavedQuestions(Object.keys(data.submission.answers || {}).map(k => parseInt(k, 10)));
+        } else {
+          setPracticeAnswers({});
+          setPracticeSavedQuestions([]);
+        }
+      } else {
+        showToast('Unable to load question paper for this topic.', 'error');
+      }
+    } catch (err) {
+      showToast('Error loading question paper.', 'error');
+    } finally {
+      setPracticePaperLoading(false);
+    }
+  };
+
+  // Launch Practice from another tab
+  const handleLaunchPractice = async (topicName) => {
+    setActiveTab('practice');
+    await loadPracticePaper(topicName);
+  };
+
+  // Grounded Practice: Save & Next
+  const handleSaveAndNextPracticeQuestion = () => {
+    if (!practicePaperData?.questions) return;
+    const currentQ = practicePaperData.questions[practiceActiveQuestionIndex];
+    const qNum = currentQ?.number || currentQ?.id || (practiceActiveQuestionIndex + 1);
+    const ansText = (practiceAnswers[qNum] || '').trim();
+
+    if (ansText) {
+      if (!practiceSavedQuestions.includes(qNum)) {
+        setPracticeSavedQuestions(prev => [...prev, qNum]);
+      }
+    }
+
+    if (practiceActiveQuestionIndex < practicePaperData.questions.length - 1) {
+      setPracticeActiveQuestionIndex(prev => prev + 1);
+    } else {
+      showToast(`Question ${qNum} saved! All 10 questions accessed.`);
+    }
+  };
+
+  // Grounded Practice: Submit Paper (Harsh Evaluation)
+  const handleSubmitPracticePaper = async () => {
+    if (!practicePaperData) return;
+    const answeredCount = Object.keys(practiceAnswers).filter(k => (practiceAnswers[k] || '').trim()).length;
+    if (answeredCount < 1) {
+      showToast('Please provide an answer to at least one question before submitting.', 'error');
+      return;
+    }
+
+    setPracticePaperSubmitting(true);
+    const token = getToken();
+    try {
+      const res = await fetch('/api/practice/paper/submit', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ topic: topicName, difficulty: 'Medium' })
+        body: JSON.stringify({
+          paper_id: practicePaperData.paper_id,
+          topic: practiceTopic,
+          answers: practiceAnswers
+        })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setPracticeDrills(data.drills || []);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Evaluation failed.');
       }
+
+      showToast(`🎉 Practice Examination Evaluated! Score: ${data.score}/100 (${data.percentage}%)`);
+      await loadPracticePaper(practiceTopic);
+      loadInitialData();
     } catch (err) {
-      showToast('Error loading practice drill.', 'error');
+      showToast(err.message, 'error');
+    } finally {
+      setPracticePaperSubmitting(false);
     }
   };
 
-  // Submit Practice Drill Answer
+  // Submit Practice Drill Answer (Legacy Fallback)
   const handleSubmitPractice = async (drill) => {
     if (practiceAnswer === null) {
       showToast('Please select an answer.', 'error');
@@ -866,7 +1007,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         setPracticeSubmitted(true);
         setPracticeFeedback(data);
         showToast(data.message);
-        // Refresh dashboard and gaps
         loadInitialData();
       }
     } catch (err) {
@@ -986,7 +1126,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
       if (res.ok) {
         showToast('Note saved successfully!');
         setNewNoteModal(false);
-        setNewNoteData({ topic: 'Quadratic Roots & Nullity', title: '', content: '', tags: 'Linear Algebra' });
+        setNewNoteData({ topic: 'Core Concept', title: '', content: '', tags: 'Course Material' });
         const nRes = await fetch('/api/personal/notes', { headers: { 'Authorization': `Bearer ${token}` } });
         if (nRes.ok) {
           const nData = await nRes.json();
@@ -1041,8 +1181,8 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
     }
   };
 
-  // Nav Items Definitions
-  const navItems = [
+  // Nav Items Definitions (Strictly separated for Student vs Instructor)
+  const studentNavItems = [
     {
       section: 'LEARNING',
       items: [
@@ -1079,6 +1219,223 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
     }
   ];
 
+  const teacherNavItems = [
+    {
+      section: 'COHORT & STUDENTS',
+      items: [
+        { id: 'overview', label: 'Dashboard', icon: LayoutDashboard, badge: 'Live' },
+        { id: 'students', label: 'Student Directory', icon: Users, badge: teacherStudentsList.length ? `${teacherStudentsList.length}` : '9' },
+        { id: 'progress_graph', label: 'Cohort Progress (0-100%)', icon: TrendingUp, badge: null },
+        { id: 'weaker_students', label: 'Weaker Students Radar', icon: ShieldAlert, badge: weakerStudentsList.length ? `${weakerStudentsList.length} alert` : null, badgeColor: 'bg-rose-950 text-rose-300 border border-rose-800' },
+      ]
+    },
+    {
+      section: 'ASSIGNMENTS & EXAMS',
+      items: [
+        { id: 'create_assignment', label: 'Create Assignment', icon: Plus, badge: 'Quiz & Paper', badgeColor: 'bg-emerald-950 text-emerald-300 border border-emerald-700/60' },
+        { id: 'submissions', label: 'Student Submissions', icon: ClipboardCheck, badge: teacherAssignmentsList.reduce((acc, a) => acc + (a.submissions_count || 0), 0) ? `${teacherAssignmentsList.reduce((acc, a) => acc + (a.submissions_count || 0), 0)} attempts` : null },
+      ]
+    },
+    {
+      section: 'INSTITUTIONAL AUDIT',
+      items: [
+        { id: 'history', label: 'Admin Audit History', icon: History, badge: adminHistoryList.length ? `${adminHistoryList.length}` : null },
+      ]
+    }
+  ];
+
+  const navItems = isTeacher ? teacherNavItems : studentNavItems;
+
+  const handleNavClick = (itemId) => {
+    if (isTeacher) {
+      setTeacherActiveTab(itemId);
+    } else {
+      setActiveTab(itemId);
+    }
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTop = 0;
+    }
+    setMobileMenuOpen(false);
+  };
+
+  const isNavActive = (itemId) => {
+    if (isTeacher) {
+      if (itemId === 'submissions') {
+        return teacherActiveTab === 'submissions' || teacherActiveTab === 'assignments_submissions';
+      }
+      return teacherActiveTab === itemId;
+    }
+    return activeTab === itemId;
+  };
+
+  // Reusable Math Grid Paper Cohort Progress Graph (Image 1 replica)
+  const renderMathGridProgressChart = () => {
+    const rawList = cohortGraphData?.students?.length ? cohortGraphData.students : teacherStudentsList;
+    const studentsToPlot = rawList.slice(0, 12);
+    const n = Math.max(studentsToPlot.length, 1);
+    const stepX = 700 / (n + 1);
+
+    const ptsHigh = studentsToPlot.map((st, idx) => ({
+      x: 65 + (idx + 1) * stepX,
+      y: 25 + (100 - (st.highest_score ?? 78)) * 2.65,
+      score: st.highest_score ?? 78,
+      student_name: st.student_name || st.name,
+      topic: st.topics?.[0]?.topic || 'Core Curriculum Mastery',
+      series: 'high'
+    }));
+
+    const ptsLow = studentsToPlot.map((st, idx) => ({
+      x: 65 + (idx + 1) * stepX,
+      y: 25 + (100 - (st.lowest_score ?? 42)) * 2.65,
+      score: st.lowest_score ?? 42,
+      student_name: st.student_name || st.name,
+      topic: st.topics?.[1]?.topic || st.topics?.[0]?.topic || 'At-Risk Concept',
+      series: 'low'
+    }));
+
+    const polyHigh = ptsHigh.map(p => `${p.x},${p.y}`).join(' ');
+    const polyLow = ptsLow.map(p => `${p.x},${p.y}`).join(' ');
+
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4 relative">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-full border border-blue-200">
+                Telemetry Progression
+              </span>
+              <h3 className="font-bold text-base text-gray-900">Cohort Student Performance Graph (0–100%)</h3>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              X-axis: Enrolled Students · Y-axis: 0–100% Mastery Criteria. Tap any dot to view student performance details.
+            </p>
+          </div>
+        </div>
+
+        {/* Selected Dot Popover Card */}
+        {activeGraphDot && (
+          <div className="p-3 bg-white border border-gray-300 rounded-xl shadow-md flex items-center justify-between animate-fadeIn max-w-md mx-auto">
+            <div className="flex items-center gap-3">
+              <div className={`w-3.5 h-3.5 rounded-full border border-slate-900 shrink-0 ${activeGraphDot.series === 'high' ? 'bg-[#FBBF24]' : 'bg-[#F43F5E]'}`} />
+              <div>
+                <h4 className="text-xs font-black text-gray-900">{activeGraphDot.student_name}</h4>
+                <p className="text-[11px] text-gray-600">
+                  {activeGraphDot.topic}: <strong className="text-gray-900 font-mono">{activeGraphDot.score}%</strong>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveGraphDot(null)}
+              className="text-gray-400 hover:text-gray-700 text-xs font-bold px-2 py-1 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* SVG Math Grid Graph */}
+        <div className="relative w-full overflow-x-auto">
+          {/* Top Right Floating Legend Card matching Image 1 */}
+          <div className="absolute top-2 right-4 bg-white/95 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-gray-300 shadow-md flex flex-col gap-1.5 text-xs z-10">
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-1.5 rounded-full bg-[#EA580C]"></span>
+              <span className="font-bold text-gray-800 text-[11px]">Cohort Mastery (%)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-1.5 rounded-full bg-[#DB2777]"></span>
+              <span className="font-bold text-gray-800 text-[11px]">Benchmark / Baseline (%)</span>
+            </div>
+          </div>
+
+          <svg className="w-full h-auto min-w-[700px]" viewBox="0 0 800 350">
+            <defs>
+              <pattern id="math-grid-pattern" width="25" height="25" patternUnits="userSpaceOnUse">
+                <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#E2E8F0" strokeWidth="1" />
+              </pattern>
+            </defs>
+
+            {/* Grid Area with Gray Border */}
+            <rect x="60" y="20" width="715" height="265" fill="url(#math-grid-pattern)" stroke="#94A3B8" strokeWidth="1" />
+
+            {/* Horizontal Y-Lines & Labels */}
+            {[100, 80, 60, 40, 20, 0].map(lvl => {
+              const y = 20 + (100 - lvl) * 2.65;
+              return (
+                <g key={`y-${lvl}`}>
+                  <line x1="60" y1={y} x2="775" y2={y} stroke="#CBD5E1" strokeWidth="1" />
+                  <text x="50" y={y + 4} textAnchor="end" fontSize="11" fontWeight="600" fill="#64748B">{lvl}%</text>
+                </g>
+              );
+            })}
+
+            {/* Vertical X-Lines & Labels */}
+            {studentsToPlot.map((st, idx) => {
+              const x = 65 + (idx + 1) * stepX;
+              return (
+                <g key={`x-${idx}`}>
+                  <line x1={x} y1="20" x2={x} y2="285" stroke="#CBD5E1" strokeWidth="1" />
+                  <text x={x} y="306" textAnchor="middle" fontSize="11" fontWeight="700" fill="#334155">{st.student_label || (`Student ${idx+1}`)}</text>
+                  <text x={x} y="322" textAnchor="middle" fontSize="9" fontWeight="500" fill="#94A3B8">{(st.student_name || st.name)?.split(' ')[0]}</text>
+                </g>
+              );
+            })}
+
+            {/* Connecting Orange Curve Line (Cohort Top Mastery) */}
+            <polyline
+              fill="none"
+              stroke="#EA580C"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              points={polyHigh}
+            />
+
+            {/* Connecting Crimson Curve Line (Benchmark Baseline) */}
+            <polyline
+              fill="none"
+              stroke="#DB2777"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              points={polyLow}
+            />
+
+            {/* Gold Dots on Orange Line (Outlined with dark rim) */}
+            {ptsHigh.map((pt, idx) => (
+              <circle
+                key={`dot-h-${idx}`}
+                cx={pt.x}
+                cy={pt.y}
+                r="6"
+                fill="#FBBF24"
+                stroke="#0F172A"
+                strokeWidth="1.5"
+                className="cursor-pointer hover:scale-125 transition-transform"
+                onClick={() => setActiveGraphDot(pt)}
+              />
+            ))}
+
+            {/* Pink Dots on Crimson Line (Outlined with dark rim) */}
+            {ptsLow.map((pt, idx) => (
+              <circle
+                key={`dot-l-${idx}`}
+                cx={pt.x}
+                cy={pt.y}
+                r="6"
+                fill="#F43F5E"
+                stroke="#0F172A"
+                strokeWidth="1.5"
+                className="cursor-pointer hover:scale-125 transition-transform"
+                onClick={() => setActiveGraphDot(pt)}
+              />
+            ))}
+          </svg>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-screen bg-[#FAF8F5] text-[#111416] font-sans antialiased overflow-hidden">
       
@@ -1101,7 +1458,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         <div>
           <div className="h-20 flex items-center justify-between px-6 border-b border-[#22282C]">
             <div 
-              onClick={() => setActiveTab('overview')} 
+              onClick={() => handleNavClick('overview')} 
               className="flex items-center gap-3 cursor-pointer group"
             >
               <div className="w-8 h-8 rounded-lg bg-[#0A0D0E] border border-[#22282C] flex items-center justify-center text-[#FAF8F5] shadow-xs group-hover:scale-105 transition-transform shrink-0">
@@ -1116,7 +1473,9 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               {!sidebarCollapsed && (
                 <div className="flex items-baseline gap-1.5">
                   <span className="font-serif italic text-xl tracking-tight text-[#FAF8F5] font-medium">GapFinder</span>
-                  <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[#0A0D0E] text-[#FAF8F5] border border-[#22282C]">AI</span>
+                  <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[#0A0D0E] text-[#FAF8F5] border border-[#22282C]">
+                    {isTeacher ? 'FACULTY' : 'AI'}
+                  </span>
                 </div>
               )}
             </div>
@@ -1141,11 +1500,11 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                 )}
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const isActive = activeTab === item.id;
+                  const isActive = isNavActive(item.id);
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => handleNavClick(item.id)}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all group ${
                         isActive
                           ? 'bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 text-emerald-300 border-l-4 border-emerald-400 shadow-sm'
@@ -1177,16 +1536,23 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
           </div>
         </div>
 
-        {/* Bottom Student Profile Card */}
+        {/* Bottom Student/Teacher Profile Card */}
         <div className="p-4 border-t border-[#22282C] bg-[#111416]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-[#003B1B] border border-[#14532D] flex items-center justify-center font-bold text-[#6BFF8F] text-sm">
-                {currentUser?.name ? currentUser.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : 'AC'}
+                {currentUser?.name ? currentUser.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : (isTeacher ? 'FA' : 'AC')}
               </div>
               {!sidebarCollapsed && (
                 <div className="truncate">
-                  <p className="text-xs font-bold text-white truncate">{currentUser?.name || 'Student'}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-white truncate">{currentUser?.name || (isTeacher ? 'Faculty Administrator' : 'Student')}</p>
+                    {isTeacher && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono font-bold">
+                        FACULTY
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[10px] text-gray-400 truncate">{currentUser?.email || ''}</p>
                 </div>
               )}
@@ -1221,10 +1587,20 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
             </button>
 
             <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-              <span className="hover:text-black cursor-pointer" onClick={() => setActiveTab('overview')}>GapFinder LMS</span>
+              <span className="hover:text-black cursor-pointer" onClick={() => handleNavClick('overview')}>
+                {isTeacher ? 'Faculty Portal' : 'GapFinder LMS'}
+              </span>
               <span>/</span>
-              <span className="text-[#003B1B] font-bold capitalize">
-                {activeTab.replace('-', ' ')}
+              <span className="text-[#003B1B] font-bold">
+                {isTeacher 
+                  ? (teacherActiveTab === 'overview' ? 'Dashboard' :
+                     teacherActiveTab === 'students' ? 'Student Directory' :
+                     teacherActiveTab === 'progress_graph' ? 'Cohort Progress (0-100%)' :
+                     teacherActiveTab === 'weaker_students' ? 'Weaker Students Radar' :
+                     teacherActiveTab === 'create_assignment' ? 'Create Assignment' :
+                     (teacherActiveTab === 'submissions' || teacherActiveTab === 'assignments_submissions') ? 'Student Submissions' :
+                     teacherActiveTab === 'history' ? 'Admin Audit History' : teacherActiveTab)
+                  : activeTab.replace('_', ' ').replace('-', ' ')}
               </span>
             </div>
           </div>
@@ -1237,38 +1613,41 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input 
                 type="text"
-                placeholder="Search topics, formulas, notes..."
+                placeholder={isTeacher ? "Search students, topics, assignments..." : "Search topics, formulas, notes..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
               />
             </div>
 
-            {/* Strict Non-Switchable Role Identity Badge (Enforces Separation of Student & Instructor) */}
-            <div 
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold select-none shadow-2xs"
-              style={currentUser?.role === 'teacher' 
-                ? { backgroundColor: '#003B1B', borderColor: '#064E3B', color: '#FAF8F5' } 
-                : { backgroundColor: '#F0EDE8', borderColor: '#D8D4CC', color: '#1B1C1A' }}
-            >
-              <span>{currentUser?.role === 'teacher' ? '👨‍🏫' : '🎓'}</span>
-              <span className="font-bold">{currentUser?.role === 'teacher' ? 'Instructor Workspace' : 'Student Workspace'}</span>
-              <span 
-                className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono ml-0.5 font-bold"
-                style={{ backgroundColor: currentUser?.role === 'teacher' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)' }}
-              >
-                {currentUser?.role === 'teacher' ? 'Faculty Portal' : 'Diagnostic Mode'}
-              </span>
-            </div>
+            {/* Teacher Role Pill (Omitted for Student Workspace to keep student header clean) */}
+            {isTeacher && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-[#003B1B] border-[#064E3B] text-[#FAF8F5] shadow-xs">
+                <span>👨‍🏫</span>
+                <span className="font-bold">Faculty Portal</span>
+              </div>
+            )}
 
-            {/* Quick Socratic AI Tutor Trigger */}
-            <button
-              onClick={() => setActiveTab('assistant')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#003B1B] text-white hover:bg-emerald-800 transition-colors shadow-sm"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
-              <span className="hidden md:inline">Ask Shubh AI</span>
-            </button>
+            {/* Quick Action Button */}
+            {isTeacher ? (
+              <button
+                type="button"
+                onClick={() => setTeacherActiveTab('create_assignment')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#003B1B] text-white hover:bg-emerald-800 transition-colors shadow-sm cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 text-emerald-300" />
+                <span className="hidden md:inline">New Assignment</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setActiveTab('assistant')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#003B1B] text-white hover:bg-emerald-800 transition-colors shadow-sm cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+                <span className="hidden md:inline">Ask Shubh AI</span>
+              </button>
+            )}
 
             {/* Notification Bell */}
             <div className="relative">
@@ -1290,12 +1669,12 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                   <div className="space-y-2.5 text-xs">
                     <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-100">
                       <p className="font-bold text-emerald-950">Assessment Evaluated</p>
-                      <p className="text-gray-600 text-[11px] mt-0.5">Identified 2 critical gaps in Quadratic Roots & Nullity.</p>
+                      <p className="text-gray-600 text-[11px] mt-0.5">Identified 2 critical gaps in course concepts.</p>
                       <span className="text-[10px] text-emerald-600 mt-1 block">15 minutes ago</span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
                       <p className="font-bold text-gray-900">Revision Task Reminder</p>
-                      <p className="text-gray-600 text-[11px] mt-0.5">Day 1: Rank-Nullity Active Proof (35 min estimated).</p>
+                      <p className="text-gray-600 text-[11px] mt-0.5">Day 1: Concept Active Review (30 min estimated).</p>
                       <span className="text-[10px] text-gray-400 mt-1 block">2 hours ago</span>
                     </div>
                   </div>
@@ -1303,14 +1682,14 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               )}
             </div>
 
-            {/* Student Profile Avatar */}
+            {/* Student/Faculty Profile Avatar */}
             <div className="relative">
               <button 
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                 className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-[#003B1B] text-[#87C695] flex items-center justify-center font-bold text-xs shadow-sm">
-                  {currentUser?.name ? currentUser.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : 'AC'}
+                  {currentUser?.name ? currentUser.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : (isTeacher ? 'FA' : 'AC')}
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
               </button>
@@ -1318,27 +1697,52 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               {profileDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50">
                   <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-xs font-bold text-gray-900">{currentUser?.name || 'Student'}</p>
+                    <p className="text-xs font-bold text-gray-900">{currentUser?.name || (isTeacher ? 'Faculty Administrator' : 'Student')}</p>
                     <p className="text-[11px] text-gray-500">{currentUser?.email || ''}</p>
                   </div>
-                  <button 
-                    onClick={() => { setActiveTab('profile'); setProfileDropdownOpen(false); }}
-                    className="w-full text-left px-4 py-2 text-xs text-emerald-800 font-semibold hover:bg-emerald-50 flex items-center gap-2"
-                  >
-                    <User className="w-3.5 h-3.5 text-emerald-600" /> View Profile & Streaks
-                  </button>
-                  <button 
-                    onClick={() => { setActiveTab('settings'); setProfileDropdownOpen(false); }}
-                    className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                  >
-                    <Settings className="w-3.5 h-3.5" /> Learning Preferences
-                  </button>
-                  <button 
-                    onClick={() => { setActiveTab('materials'); setProfileDropdownOpen(false); }}
-                    className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                  >
-                    <FileText className="w-3.5 h-3.5" /> My Ingested Materials
-                  </button>
+                  {isTeacher ? (
+                    <>
+                      <button 
+                        onClick={() => { setTeacherActiveTab('overview'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2 text-xs text-emerald-800 font-semibold hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-emerald-600" /> Cohort Overview
+                      </button>
+                      <button 
+                        onClick={() => { setTeacherActiveTab('create_assignment'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Create Assignment
+                      </button>
+                      <button 
+                        onClick={() => { setTeacherActiveTab('history'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <History className="w-3.5 h-3.5" /> Admin Audit History
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => { setActiveTab('profile'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2 text-xs text-emerald-800 font-semibold hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <User className="w-3.5 h-3.5 text-emerald-600" /> View Profile & Streaks
+                      </button>
+                      <button 
+                        onClick={() => { setActiveTab('settings'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Settings className="w-3.5 h-3.5" /> Learning Preferences
+                      </button>
+                      <button 
+                        onClick={() => { setActiveTab('materials'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5" /> My Ingested Materials
+                      </button>
+                    </>
+                  )}
                   <div className="border-t border-gray-100 my-1"></div>
                   <button 
                     onClick={onLogout}
@@ -1354,150 +1758,114 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         </header>
 
         {/* ===================== VIEW WORKSPACE (DYNAMIC BODY) ===================== */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+        <main ref={mainScrollRef} className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
           
           {/* TEACHER COHORT VIEW (Strictly locked to Instructor Role) */}
-          {currentUser?.role === 'teacher' ? (
-            <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn">
-              {/* Instructor Welcome Banner */}
-              <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#064E3B] text-white p-6 sm:p-8 rounded-3xl border border-slate-700 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-300 bg-white/10 px-3 py-1 rounded-full border border-emerald-500/30">
-                    <span>👨‍🏫 Institutional Faculty Telemetry & Cohort Control</span>
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                    {teacherData?.class_name || "Foundational STEM & Linear Systems"}
-                  </h1>
-                  <p className="text-sm text-slate-300">
-                    Lead Faculty: <strong className="text-white">{currentUser?.name || teacherData?.instructor || "Faculty Administrator"}</strong> · Real-time curriculum grounding, student material audits, and Bayesian gap telemetry.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={async () => {
-                      const token = getToken();
-                      try {
-                        const [ovRes, stRes, aRes, hRes, wRes, gRes] = await Promise.all([
-                          fetch('/api/teacher/overview', { headers: { 'Authorization': `Bearer ${token}` } }),
-                          fetch('/api/teacher/students', { headers: { 'Authorization': `Bearer ${token}` } }),
-                          fetch('/api/teacher/assignments', { headers: { 'Authorization': `Bearer ${token}` } }),
-                          fetch('/api/teacher/history', { headers: { 'Authorization': `Bearer ${token}` } }),
-                          fetch('/api/teacher/weaker-students', { headers: { 'Authorization': `Bearer ${token}` } }),
-                          fetch('/api/teacher/cohort-progress-graph', { headers: { 'Authorization': `Bearer ${token}` } })
-                        ]);
-                        if (ovRes.ok) setTeacherData(await ovRes.json());
-                        if (stRes.ok) { const d = await stRes.json(); setTeacherStudentsList(d.students || []); }
-                        if (aRes.ok) { const d = await aRes.json(); setTeacherAssignmentsList(d.assignments || []); }
-                        if (hRes.ok) { const d = await hRes.json(); setAdminHistoryList(d.history || []); }
-                        if (wRes.ok) { const d = await wRes.json(); setWeakerStudentsList(d.weaker_students || []); }
-                        if (gRes.ok) setCohortGraphData(await gRes.json());
-                        showToast('Telemetry refreshed in real time!');
-                      } catch (e) {
-                        showToast('Error refreshing data', 'error');
-                      }
-                    }}
-                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/20 transition-all flex items-center gap-2 cursor-pointer shadow-xs"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" /> Refresh Telemetry
-                  </button>
-                </div>
-              </div>
-
-              {/* Sub-Navigation Tabs */}
-              <div className="flex items-center gap-2 border-b border-gray-200 pb-3 overflow-x-auto">
-                <button
-                  type="button"
-                  onClick={() => setTeacherActiveTab('overview')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    teacherActiveTab === 'overview'
-                      ? 'bg-[#003B1B] text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>Cohort Directory & Analytics</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTeacherActiveTab('create_assignment')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    teacherActiveTab === 'create_assignment'
-                      ? 'bg-[#003B1B] text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <Plus className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>Create Assignment (Quiz / Question Paper)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTeacherActiveTab('submissions')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    teacherActiveTab === 'submissions'
-                      ? 'bg-[#003B1B] text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  <span>Student Submissions & Attempts ({teacherAssignmentsList.reduce((acc, a) => acc + (a.submissions_count || 0), 0)})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTeacherActiveTab('history')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    teacherActiveTab === 'history'
-                      ? 'bg-[#003B1B] text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <History className="w-3.5 h-3.5" />
-                  <span>Admin History & Audit Trail ({adminHistoryList.length})</span>
-                </button>
-              </div>
-
-              {/* ===================== TAB 1: COHORT DIRECTORY & ANALYTICS ===================== */}
+          {isTeacher ? (
+            <div className="max-w-7xl mx-auto space-y-6 animate-fadeIn">
+              {/* ===================== TAB 1: DASHBOARD ===================== */}
               {teacherActiveTab === 'overview' && (
-                <div className="space-y-8">
-                  {/* 1. FIRST 3 KPI CARDS: Total Students, Assignments, Analytics */}
+                <div className="space-y-8 animate-fadeIn">
+                  {/* Admin Caption Banner */}
+                  <div className="bg-gradient-to-br from-[#0A0D0E] via-[#111416] to-[#003B1B] text-white p-6 sm:p-8 rounded-3xl border border-[#22282C] shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                    <div className="space-y-1.5">
+                      <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white font-serif">
+                        Faculty Dashboard
+                      </h1>
+                      <p className="text-sm text-emerald-100/80 leading-relaxed font-sans">
+                        Real-time class analytics, student gap diagnosis, and curriculum-grounded assignments.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={async () => {
+                          const token = getToken();
+                          try {
+                            const [ovRes, stRes, aRes, hRes, wRes, gRes] = await Promise.all([
+                              fetch('/api/teacher/overview', { headers: { 'Authorization': `Bearer ${token}` } }),
+                              fetch('/api/teacher/students', { headers: { 'Authorization': `Bearer ${token}` } }),
+                              fetch('/api/teacher/assignments', { headers: { 'Authorization': `Bearer ${token}` } }),
+                              fetch('/api/teacher/history', { headers: { 'Authorization': `Bearer ${token}` } }),
+                              fetch('/api/teacher/weaker-students', { headers: { 'Authorization': `Bearer ${token}` } }),
+                              fetch('/api/teacher/cohort-progress-graph', { headers: { 'Authorization': `Bearer ${token}` } })
+                            ]);
+                            if (ovRes.ok) setTeacherData(await ovRes.json());
+                            if (stRes.ok) { const d = await stRes.json(); setTeacherStudentsList(d.students || []); }
+                            if (aRes.ok) { const d = await aRes.json(); setTeacherAssignmentsList(d.assignments || []); }
+                            if (hRes.ok) { const d = await hRes.json(); setAdminHistoryList(d.history || []); }
+                            if (wRes.ok) { const d = await wRes.json(); setWeakerStudentsList(d.weaker_students || []); }
+                            if (gRes.ok) setCohortGraphData(await gRes.json());
+                            showToast('Telemetry refreshed in real time!');
+                          } catch (e) {
+                            showToast('Error refreshing data', 'error');
+                          }
+                        }}
+                        className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/20 transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> Refresh Telemetry
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1. FIRST 3 KPI CARDS */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     {/* Card 1: Total Students */}
-                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-emerald-300 transition-all">
+                    <div 
+                      onClick={() => { setTeacherActiveTab('students'); if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0; }}
+                      className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-emerald-500 hover:shadow-md transition-all cursor-pointer group"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Students</span>
-                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#006E2F] flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#006E2F] flex items-center justify-center group-hover:scale-110 transition-transform">
                           <Users className="w-5 h-5" />
                         </div>
                       </div>
                       <div className="text-3xl font-black text-gray-900">
                         {teacherData?.total_students || teacherStudentsList.length || 9}
                       </div>
-                      <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded inline-block">
-                        Active registered cohort in database
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded inline-block">
+                          Active registered cohort
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1 group-hover:underline">
+                          View Directory →
+                        </span>
+                      </div>
                     </div>
 
                     {/* Card 2: Assignments */}
-                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-emerald-300 transition-all">
+                    <div 
+                      onClick={() => { setTeacherActiveTab('submissions'); if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0; }}
+                      className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Assignments</span>
-                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <ClipboardCheck className="w-5 h-5" />
                         </div>
                       </div>
                       <div className="text-3xl font-black text-gray-900">
                         {teacherData?.total_assignments || teacherAssignmentsList.length || 0}
                       </div>
-                      <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded inline-block">
-                        Published Quizzes & Question Papers
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded inline-block">
+                          Published Quizzes & Papers
+                        </span>
+                        <span className="text-[11px] font-bold text-blue-800 flex items-center gap-1 group-hover:underline">
+                          View Attempts →
+                        </span>
+                      </div>
                     </div>
 
                     {/* Card 3: Analytics */}
-                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-emerald-300 transition-all">
+                    <div 
+                      onClick={() => { setTeacherActiveTab('progress_graph'); if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0; }}
+                      className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-2 hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Analytics</span>
-                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <TrendingUp className="w-5 h-5" />
                         </div>
                       </div>
@@ -1507,27 +1875,32 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                         </span>
                         <span className="text-xs text-gray-500 font-medium">Cohort Mean Mastery</span>
                       </div>
-                      <span className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded inline-block">
-                        Target benchmark standard: ≥75%
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded inline-block">
+                          Benchmark: ≥75%
+                        </span>
+                        <span className="text-[11px] font-bold text-amber-800 flex items-center gap-1 group-hover:underline">
+                          Open Telemetry Graph →
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* 2. TABULAR STUDENT DIRECTORY (Directly below 3 cards) */}
+                  {/* 2. STUDENT DIRECTORY TABULAR VIEW */}
                   <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FAF8F5]">
+                    <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                            Live Student Registry
+                            Student Directory
                           </span>
-                          <h2 className="text-base font-bold text-gray-900">Registered Students Directory</h2>
+                          <h3 className="font-bold text-base text-gray-900">Enrolled Student Cohort Registry</h3>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          Click the Eye Icon on any student to inspect their uploaded materials, topics studying, page counts, and upload dates.
+                          Click the Eye Icon to view student material upload summary, topics studying, and submission dates.
                         </p>
                       </div>
-                      <span className="text-xs font-semibold text-gray-700 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shrink-0">
+                      <span className="text-xs font-bold text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 shrink-0">
                         {teacherStudentsList.length || 9} Students Listed
                       </span>
                     </div>
@@ -1601,150 +1974,178 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                     </div>
                   </div>
 
-                  {/* 3. INTERACTIVE COHORT ANALYTICS GRAPH (0–100% Criteria) */}
-                  <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                  {/* 3. COHORT PROGRESS GRAPH (IMAGE 1 REPLICA WITH MATH GRID PAPER) */}
+                  {renderMathGridProgressChart()}
+
+                  {/* 4. WEAKER STUDENTS SECTION */}
+                  <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-100 pb-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-full border border-blue-200">
-                            Telemetry Graph
+                          <span className="text-[10px] font-bold uppercase bg-red-100 text-red-900 px-2.5 py-0.5 rounded-full border border-red-200">
+                            Immediate Remediation Required
                           </span>
-                          <h2 className="text-base font-bold text-gray-900">Cohort Student Topic Progress (0–100%)</h2>
+                          <h3 className="text-base font-bold text-gray-900">Weaker Students & Specific Gap Topics (&lt;50%)</h3>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          X-axis: Students · Y-axis: 0–100% Criteria. Hover/Tap any dot on the growth lines to inspect student name, topic, and performance.
+                          Surfaced separately so faculty can assign focused drills or dedicate lecture time to the exact bottleneck concepts.
                         </p>
                       </div>
-                      <div className="flex items-center gap-4 text-xs font-medium">
-                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500"></span> Mastered (≥80%)</span>
-                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-500"></span> Needs Review (50-79%)</span>
-                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500"></span> Critical Gap (&lt;50%)</span>
-                      </div>
+                      <span className="text-xs font-bold text-red-700 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 shrink-0">
+                        {weakerStudentsList.length} At-Risk Incident(s)
+                      </span>
                     </div>
 
-                    {/* Interactive SVG Chart */}
-                    <div className="relative pt-6 pb-2">
-                      <div className="w-full h-72 relative">
-                        {/* Y-Axis Grid Lines & Labels */}
-                        {[100, 80, 60, 40, 20, 0].map((lvl, lIdx) => {
-                          const topPct = `${100 - lvl}%`;
-                          return (
-                            <div key={lvl} className="absolute left-0 right-0 flex items-center" style={{ top: topPct }}>
-                              <span className="w-10 text-[10px] font-mono text-gray-400 text-right pr-2 shrink-0">{lvl}%</span>
-                              <div className="flex-1 border-b border-gray-100"></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {weakerStudentsList.length === 0 ? (
+                        <div className="col-span-full p-8 text-center bg-emerald-50/50 rounded-xl border border-emerald-200 text-emerald-900 text-xs font-semibold">
+                          🎉 Excellent! No students currently fall below the 50% mastery threshold.
+                        </div>
+                      ) : (
+                        weakerStudentsList.map((ws, idx) => (
+                          <div key={idx} className="p-4 rounded-xl border border-red-200 bg-red-50/30 space-y-2 hover:bg-white transition-all">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-gray-900 text-xs">{ws.name}</span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-red-100 text-red-800 border border-red-200">
+                                {ws.severity || 'Critical Deficit'}
+                              </span>
                             </div>
-                          );
-                        })}
-
-                        {/* Interactive Data Plot Area */}
-                        <div className="absolute left-12 right-4 top-0 bottom-0">
-                          {(() => {
-                            const studentsToPlot = cohortGraphData?.students || teacherStudentsList.slice(0, 8);
-                            const n = Math.max(studentsToPlot.length, 1);
-                            const step = 100 / (n + 1);
-
-                            // Calculate polygon points for connecting lines
-                            const avgPoints = studentsToPlot.map((st, idx) => {
-                              const x = (idx + 1) * step;
-                              const y = 100 - (st.average_score || 60);
-                              return `${x},${y}`;
-                            }).join(' ');
-
-                            return (
-                              <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-                                {/* Connecting Average Line */}
-                                <polyline
-                                  fill="none"
-                                  stroke="#10B981"
-                                  strokeWidth="1.5"
-                                  strokeDasharray="2,2"
-                                  points={avgPoints}
-                                />
-
-                                {/* Interactive Data Dots */}
-                                {studentsToPlot.map((st, idx) => {
-                                  const x = (idx + 1) * step;
-                                  const topics = st.topics || [
-                                    { topic: "Linear Systems", score: st.highest_score || 85 },
-                                    { topic: "Matrix Rank & Vector Pivot", score: st.lowest_score || 38 }
-                                  ];
-
-                                  return topics.map((t, tIdx) => {
-                                    const y = 100 - (t.score || 50);
-                                    const dotColor = t.score >= 80 ? '#10B981' : (t.score >= 50 ? '#F59E0B' : '#EF4444');
-
-                                    return (
-                                      <g key={`${idx}-${tIdx}`}>
-                                        <circle
-                                          cx={x}
-                                          cy={y}
-                                          r="2.5"
-                                          fill={dotColor}
-                                          stroke="#FFFFFF"
-                                          strokeWidth="1"
-                                          className="cursor-pointer hover:scale-150 transition-transform"
-                                          onMouseEnter={() => setActiveGraphDot({
-                                            student_name: st.student_name || st.name,
-                                            topic: t.topic,
-                                            score: t.score,
-                                            x: x,
-                                            y: y
-                                          })}
-                                          onClick={() => setActiveGraphDot({
-                                            student_name: st.student_name || st.name,
-                                            topic: t.topic,
-                                            score: t.score,
-                                            x: x,
-                                            y: y
-                                          })}
-                                        />
-                                      </g>
-                                    );
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-700 font-semibold">Deficit Topic: <strong className="text-red-700">{ws.topic}</strong></span>
+                              <span className="font-mono font-bold text-red-600 text-sm">{ws.score}%</span>
+                            </div>
+                            <p className="text-[11px] text-gray-600 leading-relaxed italic bg-white p-2 rounded border border-red-100">
+                              "{ws.recommended_action || `Review foundational prerequisites on ${ws.topic}.`}"
+                            </p>
+                            <div className="pt-1 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const token = getToken();
+                                  const res = await fetch('/api/teacher/broadcast-drill', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify({ topic: ws.topic, message: `Instructor assigned targeted remedial drill for ${ws.topic}.` })
                                   });
-                                })}
-                              </svg>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* X-Axis Student Labels */}
-                      <div className="flex justify-between pl-12 pr-4 pt-3 border-t border-gray-200">
-                        {(cohortGraphData?.students || teacherStudentsList.slice(0, 8)).map((st, idx) => (
-                          <div key={idx} className="text-center">
-                            <span className="text-[10px] font-bold text-gray-700 block">
-                              {st.student_label || `Student ${idx + 1}`}
-                            </span>
-                            <span className="text-[9px] text-gray-400 block truncate max-w-[60px]">
-                              {(st.student_name || st.name)?.split(' ')[0]}
-                            </span>
+                                  if (res.ok) {
+                                    showToast(`Remedial drill assigned to ${ws.name} on ${ws.topic}!`);
+                                  }
+                                }}
+                                className="px-3 py-1 bg-[#003B1B] hover:bg-emerald-900 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                              >
+                                Assign Drill
+                              </button>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-
-                      {/* Tooltip Card on tap/hover */}
-                      {activeGraphDot && (
-                        <div className="mt-4 p-4 rounded-xl bg-[#0A0D0E] text-white border border-emerald-500/40 shadow-xl flex items-center justify-between animate-fadeIn">
-                          <div>
-                            <span className="text-[10px] uppercase font-bold text-emerald-400">Selected Telemetry Dot</span>
-                            <h4 className="text-sm font-bold text-white">{activeGraphDot.student_name}</h4>
-                            <p className="text-xs text-gray-300 mt-0.5">Topic: <strong className="text-white">{activeGraphDot.topic}</strong></p>
-                          </div>
-                          <div className="text-right">
-                            <span className={`text-2xl font-black font-mono ${
-                              activeGraphDot.score >= 80 ? 'text-emerald-400' :
-                              activeGraphDot.score >= 50 ? 'text-amber-400' : 'text-red-400'
-                            }`}>
-                              {activeGraphDot.score}%
-                            </span>
-                            <span className="text-[10px] text-gray-400 block font-semibold">Mastery Performance</span>
-                          </div>
-                        </div>
+                        ))
                       )}
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {/* 4. WEAKER STUDENTS SECTION (Score < 50% & Topic Occurred) */}
+              {/* ===================== TAB 2: STUDENT DIRECTORY ===================== */}
+              {teacherActiveTab === 'students' && (
+                <div className="space-y-6 animate-fadeIn">
+                  <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          Live Student Registry
+                        </span>
+                        <h1 className="text-xl font-black text-gray-900">Student Cohort Directory & Uploaded Materials Audit</h1>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Click the Eye Icon on any student to inspect their uploaded materials, topics studying, page counts, and upload dates.
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-gray-700 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shrink-0">
+                      {teacherStudentsList.length || 9} Students Listed
+                    </span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                          <tr>
+                            <th className="py-3 px-4">S.No</th>
+                            <th className="py-3 px-4">Student Name</th>
+                            <th className="py-3 px-4">Institutional Email</th>
+                            <th className="py-3 px-4">Materials Uploaded</th>
+                            <th className="py-3 px-4">Topics Studied</th>
+                            <th className="py-3 px-4">Average Mastery</th>
+                            <th className="py-3 px-4 text-center">Inspect Material</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {teacherStudentsList.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-gray-400">Loading student registry...</td>
+                            </tr>
+                          ) : (
+                            teacherStudentsList.map((st, idx) => (
+                              <tr key={st.id || idx} className="hover:bg-emerald-50/40 transition-colors">
+                                <td className="py-3.5 px-4 font-mono font-bold text-gray-500">{st.s_no || idx + 1}</td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-bold text-gray-900 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-[#006E2F] text-[10px] font-bold flex items-center justify-center">
+                                      {st.name.charAt(0)}
+                                    </div>
+                                    <span>{st.name}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 font-mono text-gray-600">{st.email}</td>
+                                <td className="py-3.5 px-4">
+                                  <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-800">
+                                    {st.materials_count || 1} Document(s)
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <span className="font-semibold text-gray-700">
+                                    {st.topics_count || 7} Topics
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                    (st.average_mastery || 60) >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                                    (st.average_mastery || 60) >= 50 ? 'bg-amber-100 text-amber-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {st.average_mastery || 60}%
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEyeModal(st.id)}
+                                    title={`View materials and topics for ${st.name}`}
+                                    className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#003B1B] rounded-lg border border-emerald-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Eye className="w-4 h-4 text-emerald-700" />
+                                    <span className="text-[11px] font-bold">Summary</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ===================== TAB 3: COHORT PROGRESS GRAPH ===================== */}
+              {teacherActiveTab === 'progress_graph' && (
+                <div className="space-y-6 animate-fadeIn">
+                  {renderMathGridProgressChart()}
+                </div>
+              )}
+
+              {/* ===================== TAB 4: WEAKER STUDENTS SECTION ===================== */}
+              {teacherActiveTab === 'weaker_students' && (
+                <div className="space-y-6 animate-fadeIn">
                   <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-100 pb-3">
                       <div>
@@ -1892,7 +2293,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                           required
                           value={assignmentForm.topic}
                           onChange={(e) => setAssignmentForm({ ...assignmentForm, topic: e.target.value })}
-                          placeholder="e.g. Matrix Rank & Vector Pivot"
+                          placeholder="e.g. Core Topic or Uploaded Chapter"
                           className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:ring-1 focus:ring-black"
                         />
                       </div>
@@ -2268,7 +2669,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                           Course Assignments Assigned by Faculty
                         </span>
                         {pendingStudentAssignmentsCount > 0 && (
@@ -2279,9 +2680,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                       </div>
                       <h2 className="text-lg font-bold text-gray-900 mt-1">Grounding Quizzes & Question Papers</h2>
                     </div>
-                    <span className="text-xs text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 font-medium">
-                      Strict scheduled attempt window enforced
-                    </span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2300,19 +2698,27 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                           Topic: <strong className="text-gray-900">{a.topic}</strong> · Faculty: <strong>{a.faculty_name}</strong>
                         </p>
 
-                        <div className="p-2 rounded-lg bg-white border border-gray-200 flex items-center justify-between text-[11px] font-mono">
-                          <span className="text-gray-500">Attempt Window:</span>
-                          <span className={`font-bold ${a.can_attempt ? 'text-emerald-700' : (a.is_upcoming ? 'text-amber-700' : 'text-gray-500')}`}>
-                            {a.time_status_label}
+                        <div className="flex items-center justify-between text-[11px] text-gray-600 pt-1">
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <Clock className="w-3.5 h-3.5 text-gray-400" />
+                            <span>{a.time_status_label}</span>
                           </span>
+                          {a.has_submitted && (
+                            <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              Attempted · {a.submission?.percentage}%
+                            </span>
+                          )}
                         </div>
 
                         <div className="pt-2 flex items-center justify-between border-t border-gray-100">
                           {a.has_submitted ? (
-                            <span className="text-emerald-700 font-bold flex items-center gap-1.5">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                              <span>Completed · Score: {a.submission?.percentage}% ({a.submission?.score}/{a.submission?.total_marks})</span>
-                            </span>
+                            <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200 w-full justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                <span>Attempted · Score: {a.submission?.percentage}% ({a.submission?.score}/{a.submission?.total_marks})</span>
+                              </span>
+                              <span className="text-[10px] uppercase font-semibold text-gray-500">Locked</span>
+                            </div>
                           ) : a.can_attempt ? (
                             <button
                               type="button"
@@ -2871,12 +3277,30 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500 font-medium">5 Units · 12 Topics</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    {topicMapData?.units?.length || 0} Units · {topicMapData?.units?.reduce((acc, u) => acc + (u.chapters?.reduce((cAcc, c) => cAcc + (c.topics?.length || 0), 0) || 0), 0)} Topics
+                  </span>
                 </div>
               </div>
 
-              {/* Expandable Topic Tree */}
-              <div className="space-y-4">
+              {/* Expandable Topic Tree or Empty State */}
+              {(!topicMapData?.units || topicMapData.units.length === 0) ? (
+                <div className="bg-white rounded-2xl border border-dashed border-[#E4DFD5] p-12 text-center space-y-4">
+                  <Layers className="w-12 h-12 text-emerald-600 mx-auto" />
+                  <h3 className="text-base font-bold text-gray-900">No Curriculum Uploaded Yet</h3>
+                  <p className="text-xs text-gray-500 max-w-md mx-auto">
+                    Upload your course syllabus, lecture notes, or textbook chapter in 'My Materials' to dynamically generate your grounded Topic Map.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('materials')}
+                    className="px-5 py-2.5 bg-[#003B1B] text-white font-bold text-xs rounded-xl hover:bg-emerald-900 transition-colors inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Go to My Materials</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
                 {topicMapData?.units?.map((unit) => {
                   const isExpanded = expandedUnits[unit.unit_id];
                   return (
@@ -2982,6 +3406,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                   );
                 })}
               </div>
+              )}
 
               {/* Retrieval-Grounded Past Exam Question Mappings (Satisfies Hackathon PS Condition 1) */}
               <div className="bg-white rounded-2xl border border-[#E4DFD5] p-6 shadow-xs space-y-4">
@@ -3723,7 +4148,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                           type="text"
                           value={scheduleForm.topic}
                           onChange={(e) => setScheduleForm({ ...scheduleForm, topic: e.target.value })}
-                          placeholder="e.g. Quadratic Roots & Nullity or Uploaded Unit"
+                          placeholder="e.g. Core Concept or Uploaded Chapter"
                           className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-gray-50"
                         />
                       </div>
@@ -4027,143 +4452,399 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
             </div>
           )}
 
-          {/* TAB 7: TARGETED PRACTICE QUESTIONS & RETESTING */}
+          {/* TAB 7: GROUNDED PRACTICE EXAMINATION & ANSWER SHEET */}
           {activeTab === 'practice' && (
-            <div className="max-w-4xl mx-auto space-y-6">
+            <div className="max-w-7xl mx-auto space-y-6">
               
-              <div className="border-b border-[#E4DFD5] pb-5">
-                <span className="text-xs font-bold text-[#006E2F] uppercase tracking-widest">Adaptive Learning Loop</span>
-                <h1 className="text-2xl font-extrabold text-gray-900 mt-1">Targeted Concept Practice & Retesting</h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Practice questions testing the specific misconceptions identified in your Knowledge Gap Report. Passing drills updates your topic mastery!
-                </p>
+              {/* Header with Top Submit Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E4DFD5] pb-5">
+                <div>
+                  <span className="text-xs font-bold text-[#006E2F] uppercase tracking-widest">Formal Assessment Grounding</span>
+                  <h1 className="text-2xl font-extrabold text-gray-900 mt-1">Grounded Academic Practice Examination</h1>
+                  <p className="text-sm text-gray-500 mt-1">
+                    10 comprehensive questions grounded strictly in your uploaded course material (10 marks each = 100 marks total).
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {practicePaperData?.has_submitted ? (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-bold shadow-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Submitted & Evaluated · {practicePaperData.submission?.score}/100 ({practicePaperData.submission?.percentage}%)</span>
+                    </div>
+                  ) : practicePaperData ? (
+                    <button
+                      type="button"
+                      onClick={handleSubmitPracticePaper}
+                      disabled={practicePaperSubmitting}
+                      className="px-5 py-2.5 bg-[#003B1B] hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-[1.02]"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>{practicePaperSubmitting ? 'Evaluating Harshly...' : 'Submit Test (100 Marks)'}</span>
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
-              {/* Topic Selector Chips & Practice Runner */}
-              {(() => {
-                const availablePracticeTopics = (
-                  dashboardData?.gaps?.length > 0
-                    ? dashboardData.gaps.map(g => g.topic)
-                    : (topicMapData?.units?.flatMap(u => u.chapters?.flatMap(c => c.topics?.map(t => t.name) || []) || []) || [])
-                );
+              {/* Topic Selector Chips (Only Grounded in Uploaded Materials) */}
+              {!practiceHasDocuments || practiceTopicsList.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-dashed border-[#E4DFD5] p-12 text-center space-y-4">
+                  <FileText className="w-12 h-12 text-emerald-600 mx-auto" />
+                  <h3 className="text-base font-bold text-gray-900">No Course Material Uploaded Yet</h3>
+                  <p className="text-xs text-gray-500 max-w-md mx-auto">
+                    Upload your syllabus, lecture notes, or textbook chapter in 'My Materials' to dynamically generate your grounded 10-Question Examination Paper.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('materials')}
+                    className="px-5 py-2.5 bg-[#003B1B] text-white font-bold text-xs rounded-xl hover:bg-emerald-900 transition-colors inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Go to My Materials</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Topic Chips */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    {practiceTopicsList.map(t => (
+                      <button
+                        key={t.topic}
+                        onClick={() => loadPracticePaper(t.topic)}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
+                          practiceTopic === t.topic
+                            ? 'bg-[#003B1B] text-white shadow-sm ring-1 ring-emerald-600'
+                            : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>{t.topic}</span>
+                      </button>
+                    ))}
+                  </div>
 
-                return (
-                  <div className="space-y-4">
-                    {availablePracticeTopics.length > 0 ? (
-                      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                        {availablePracticeTopics.map(top => (
-                          <button
-                            key={top}
-                            onClick={() => handleLaunchPractice(top)}
-                            className={`px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                              practiceTopic === top ? 'bg-[#003B1B] text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-                            }`}
-                          >
-                            {top}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-600 text-center">
-                        Complete your first skill assessment to identify concepts needing practice.
-                      </div>
-                    )}
+                  {/* Loading State */}
+                  {practicePaperLoading && (
+                    <div className="p-12 text-center bg-white rounded-2xl border border-gray-200 text-xs font-semibold text-gray-500 flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Generating Grounded 10-Question Paper from Course Material...</span>
+                    </div>
+                  )}
 
-                    {/* Drill Question Card or Empty State */}
-                    {practiceDrills.length > 0 ? (() => {
-                      const drill = practiceDrills[0];
-                      return (
-                        <div className="bg-white rounded-2xl border border-[#E4DFD5] p-6 md:p-8 shadow-sm space-y-6">
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#006E2F] bg-emerald-50 px-2 py-0.5 rounded">
-                                Targeted Drill · {practiceTopic}
+                  {/* Grounded Examination Paper & Answer Sheet */}
+                  {practicePaperData && !practicePaperLoading && (
+                    <div className="space-y-6 animate-fadeIn">
+                      
+                      {/* Post-Submission Weakest Points & Evaluation Banner */}
+                      {practicePaperData.has_submitted && practicePaperData.submission && (
+                        <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#064E3B] text-white p-6 sm:p-8 rounded-3xl border border-slate-700 shadow-xl space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700 pb-4">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full border border-emerald-500/30">
+                                Harsh Diagnostic Evaluation Completed
                               </span>
-                              <span className="text-xs text-gray-400 font-mono">{drill.source_citation}</span>
+                              <h2 className="text-xl font-black text-white mt-1">Examination Results & Knowledge Gap Summary</h2>
                             </div>
-                            <h3 className="text-base font-bold text-gray-900 pt-2 leading-snug">
-                              {drill.question}
-                            </h3>
+                            <div className="text-right">
+                              <span className="text-3xl font-black font-mono text-emerald-400">
+                                {practicePaperData.submission.score} / {practicePaperData.submission.total_marks || 100}
+                              </span>
+                              <span className="text-xs text-slate-300 block font-semibold">
+                                Final Percentage: {practicePaperData.submission.percentage}%
+                              </span>
+                            </div>
                           </div>
 
-                          {/* Options */}
-                          <div className="space-y-3">
-                            {drill.options?.map((opt, oIdx) => {
-                              const isSelected = practiceAnswer === oIdx;
+                          {/* Weakest Points */}
+                          <div className="space-y-2">
+                            <span className="text-xs font-bold text-rose-300 uppercase tracking-wider block">
+                              Diagnosed Conceptual Deficits & Weakest Points:
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                              {practicePaperData.submission.weakest_points?.map((wp, idx) => (
+                                <div key={idx} className="p-3 bg-white/10 rounded-xl border border-rose-500/30 text-xs space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] font-bold">
+                                    <span className="text-rose-300">{wp.topic || `Gap #${idx+1}`}</span>
+                                    <span className="text-rose-400 font-mono">{wp.deficit_score ?? 40}%</span>
+                                  </div>
+                                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                                    {wp.focus_area || wp.note || "Focus on foundational definitions and architectural flows."}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="pt-2 flex flex-wrap items-center gap-3">
+                            <button
+                              onClick={() => setActiveTab('gaps')}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              <span>View Knowledge Gap Report →</span>
+                            </button>
+                            <button
+                              onClick={() => setActiveTab('revision')}
+                              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition-colors flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                              <span>Open Personalized Revision Plan →</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Split 2-Column Layout: Left (Question Paper), Right (Answer Sheet) */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                        
+                        {/* LEFT COLUMN: White Examination Question Paper (PDF Style) */}
+                        <div className="bg-white rounded-2xl border border-gray-300 p-6 sm:p-8 shadow-sm space-y-6 max-h-[750px] overflow-y-auto custom-scrollbar">
+                          {/* Formal Header */}
+                          <div className="border-b border-gray-200 pb-4 text-center space-y-1">
+                            <span className="text-[10px] font-extrabold tracking-widest uppercase text-gray-500">
+                              GAPFINDER FORMAL EXAMINATION SERIES · 2026
+                            </span>
+                            <h2 className="text-lg font-black text-gray-900 tracking-tight">
+                              {practicePaperData.title || `Academic Examination: ${practicePaperData.topic}`}
+                            </h2>
+                            <p className="text-xs text-gray-500 font-medium">
+                              Course Material: <strong className="text-gray-900">{practicePaperData.document_title}</strong>
+                            </p>
+                            <div className="flex items-center justify-center gap-4 text-[11px] font-bold text-gray-600 pt-1">
+                              <span>Time Allowed: 45 Minutes</span>
+                              <span>·</span>
+                              <span>Maximum Marks: 100</span>
+                              <span>·</span>
+                              <span>10 Questions</span>
+                            </div>
+                          </div>
+
+                          {/* Instructions */}
+                          <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-700 space-y-1">
+                            <p className="font-bold text-gray-900">INSTRUCTIONS TO CANDIDATES:</p>
+                            <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-gray-600">
+                              {practicePaperData.instructions?.map((inst, idx) => (
+                                <li key={idx}>{inst}</li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          {/* Questions List (Q1 to Q10) */}
+                          <div className="space-y-4">
+                            {practicePaperData.questions?.map((q, idx) => {
+                              const qNum = q.number || (idx + 1);
+                              const isCurrent = practiceActiveQuestionIndex === idx;
+                              const isSaved = practiceSavedQuestions.includes(qNum) || Boolean((practiceAnswers[qNum] || '').trim());
+
                               return (
                                 <div
-                                  key={oIdx}
-                                  onClick={() => !practiceSubmitted && setPracticeAnswer(oIdx)}
-                                  className={`p-4 rounded-xl border text-xs font-medium cursor-pointer transition-all flex items-start gap-3 ${
-                                    isSelected
-                                      ? 'border-[#003B1B] bg-emerald-50/50 text-[#00210D]'
-                                      : 'border-gray-200 hover:bg-gray-50 text-gray-800'
+                                  key={idx}
+                                  onClick={() => setPracticeActiveQuestionIndex(idx)}
+                                  className={`p-4 rounded-xl border transition-all cursor-pointer space-y-2 ${
+                                    isCurrent
+                                      ? 'border-[#003B1B] bg-emerald-50/40 ring-2 ring-[#003B1B]/15 shadow-xs'
+                                      : 'border-gray-200 hover:border-gray-300 bg-white'
                                   }`}
                                 >
-                                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
-                                    isSelected ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-gray-300'
-                                  }`}>
-                                    {isSelected && <Check className="w-3 h-3" />}
+                                  <div className="flex items-center justify-between text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`w-6 h-6 rounded-md font-bold text-xs flex items-center justify-center ${
+                                        isSaved
+                                          ? 'bg-emerald-600 text-white'
+                                          : 'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {qNum}
+                                      </span>
+                                      <span className="font-bold text-gray-900">Question {qNum}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {isSaved && (
+                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                                          ✓ Completed
+                                        </span>
+                                      )}
+                                      <span className="text-[11px] font-mono font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                                        [10 Marks]
+                                      </span>
+                                    </div>
                                   </div>
-                                  <span className="leading-relaxed">{opt}</span>
+
+                                  <p className="text-xs text-gray-800 font-medium leading-relaxed">
+                                    {q.question_text || q.question}
+                                  </p>
+
+                                  {(q.key_concepts || (q.key_points && q.key_points.join(' · ')) || q.citation) && (
+                                    <span className="inline-block text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                      Key: {q.key_concepts || (q.key_points && q.key_points[0]) || q.citation}
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
                           </div>
-
-                          {/* Feedback Explanation (shown after submission) */}
-                          {practiceSubmitted && practiceFeedback && (
-                            <div className={`p-4 rounded-xl border space-y-2 text-xs ${
-                              practiceFeedback.is_correct ? 'bg-[#E6F4EA] border-[#A7E8BD] text-[#006E2F]' : 'bg-[#FFDAD6]/40 border-[#FFDAD6] text-[#BA1A1A]'
-                            }`}>
-                              <div className="flex items-center justify-between font-bold">
-                                <span>{practiceFeedback.is_correct ? '✓ Correct! Concept Verified' : '✗ Incorrect Concept Application'}</span>
-                                <span>Mastery: {practiceFeedback.previous_score}% → {practiceFeedback.new_score}%</span>
-                              </div>
-                              <p className="leading-relaxed">{drill.explanation}</p>
-                            </div>
-                          )}
-
-                          <div className="pt-4 border-t flex justify-end">
-                            {!practiceSubmitted ? (
-                              <button
-                                onClick={() => handleSubmitPractice(drill)}
-                                className="px-6 py-2.5 bg-[#003B1B] hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
-                              >
-                                Check Answer & Update Mastery
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleLaunchPractice(practiceTopic)}
-                                className="px-6 py-2.5 bg-[#003B1B] hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md"
-                              >
-                                Next Practice Question →
-                              </button>
-                            )}
-                          </div>
                         </div>
-                      );
-                    })() : (
-                      <div className="bg-white rounded-2xl border border-dashed border-[#E4DFD5] p-10 text-center space-y-3">
-                        <Zap className="w-10 h-10 text-emerald-600 mx-auto" />
-                        <h3 className="text-base font-bold text-gray-900">Select a Topic to Start Practice</h3>
-                        <p className="text-xs text-gray-500 max-w-md mx-auto">
-                          Choose any topic above or click "2-Min Drill" from your Knowledge Gap Report to load targeted questions and improve your verified topic mastery.
-                        </p>
-                        {availablePracticeTopics.length > 0 && (
-                          <button
-                            onClick={() => handleLaunchPractice(availablePracticeTopics[0])}
-                            className="px-5 py-2.5 bg-[#003B1B] text-white font-bold text-xs rounded-xl hover:bg-emerald-900 transition-colors inline-flex items-center gap-1.5 shadow-sm"
-                          >
-                            <Play className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Launch Drill: {availablePracticeTopics[0]}</span>
-                          </button>
-                        )}
+
+                        {/* RIGHT COLUMN: White Examination Answer Sheet */}
+                        <div className="bg-white rounded-2xl border border-gray-300 p-6 sm:p-8 shadow-sm flex flex-col justify-between max-h-[750px] space-y-5">
+                          {/* Palette Strip */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                                Question Navigation Palette
+                              </span>
+                              <span className="text-[11px] font-bold text-emerald-700">
+                                {practiceSavedQuestions.length} / 10 Answered
+                              </span>
+                            </div>
+
+                            {/* 10 Question Pills: Turns Emerald Green upon completion */}
+                            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                              {practicePaperData.questions?.map((_, idx) => {
+                                const qNum = idx + 1;
+                                const isCurrent = practiceActiveQuestionIndex === idx;
+                                const isSaved = practiceSavedQuestions.includes(qNum) || Boolean((practiceAnswers[qNum] || '').trim());
+
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setPracticeActiveQuestionIndex(idx)}
+                                    className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex flex-col items-center justify-center ${
+                                      isSaved
+                                        ? 'bg-emerald-600 text-white font-extrabold ring-2 ring-emerald-700 shadow-xs'
+                                        : isCurrent
+                                        ? 'bg-gray-900 text-white font-extrabold ring-2 ring-gray-900'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                                    }`}
+                                  >
+                                    <span>Q{qNum}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Active Question Prompt */}
+                          {(() => {
+                            const currentQ = practicePaperData.questions?.[practiceActiveQuestionIndex] || {};
+                            const currentQNum = currentQ.number || currentQ.id || (practiceActiveQuestionIndex + 1);
+                            const evaluationData = practicePaperData.submission?.evaluation?.[currentQNum] || practicePaperData.submission?.evaluation?.[String(currentQNum)];
+
+                            return (
+                              <div className="flex-1 flex flex-col justify-between space-y-4">
+                                <div className="space-y-2 border-t border-gray-100 pt-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                      Candidate Answer Sheet · Question {currentQNum} of 10
+                                    </span>
+                                    <span className="text-xs font-mono font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">
+                                      Carries: 10 Marks
+                                    </span>
+                                  </div>
+
+                                  <h3 className="text-sm font-bold text-gray-900 leading-snug">
+                                    {currentQ.question_text || currentQ.question}
+                                  </h3>
+                                </div>
+
+                                {/* Subjective Writing Area */}
+                                <div className="flex-1">
+                                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider block mb-1.5">
+                                    Candidate Written Solution / Mathematical Derivation:
+                                  </label>
+                                  <textarea
+                                    rows={10}
+                                    value={practiceAnswers[currentQNum] || ''}
+                                    onChange={(e) => {
+                                      if (!practicePaperData.has_submitted) {
+                                        setPracticeAnswers(prev => ({ ...prev, [currentQNum]: e.target.value }));
+                                      }
+                                    }}
+                                    disabled={practicePaperData.has_submitted}
+                                    placeholder={
+                                      practicePaperData.has_submitted
+                                        ? "This examination has been submitted. Answers are locked in read-only mode."
+                                        : `Write your comprehensive analytical solution for Question ${currentQNum} here. Include step-by-step principles, mathematical proofs, and architectural details...`
+                                    }
+                                    className={`w-full p-4 rounded-xl border text-xs font-mono leading-relaxed transition-all focus:outline-none ${
+                                      practicePaperData.has_submitted
+                                        ? 'bg-gray-50 border-gray-200 text-gray-700 cursor-not-allowed'
+                                        : 'bg-white border-gray-300 focus:border-[#003B1B] focus:ring-1 focus:ring-[#003B1B]'
+                                    }`}
+                                  />
+                                </div>
+
+                                {/* Evaluation Feedback for this Question (Post-Submission) */}
+                                {practicePaperData.has_submitted && evaluationData && (
+                                  <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1.5 text-xs">
+                                    <div className="flex items-center justify-between font-bold">
+                                      <span className="text-amber-900">Academic Grading Feedback (Harsh Rubric):</span>
+                                      <span className="text-amber-950 font-mono text-sm">
+                                        Marks: {evaluationData.marks} / 10
+                                      </span>
+                                    </div>
+                                    <p className="text-gray-700 leading-relaxed font-sans">
+                                      {evaluationData.critique}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Bottom Buttons: Prev, Next, Save & Next, and Submit */}
+                                <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={practiceActiveQuestionIndex === 0}
+                                      onClick={() => setPracticeActiveQuestionIndex(prev => Math.max(0, prev - 1))}
+                                      className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 text-gray-800 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                                    >
+                                      <ArrowLeft className="w-3.5 h-3.5" /> Previous
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={practiceActiveQuestionIndex === (practicePaperData.questions?.length - 1)}
+                                      onClick={() => setPracticeActiveQuestionIndex(prev => Math.min(practicePaperData.questions.length - 1, prev + 1))}
+                                      className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 text-gray-800 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                                    >
+                                      Next <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+
+                                  {!practicePaperData.has_submitted ? (
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={handleSaveAndNextPracticeQuestion}
+                                        className="px-5 py-2.5 bg-[#003B1B] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                                      >
+                                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>Save & Next</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={handleSubmitPracticePaper}
+                                        disabled={practicePaperSubmitting}
+                                        className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                                        <span>Submit Test</span>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs font-bold text-gray-500 italic">
+                                      🔒 Submission locked. View feedback above.
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           )}
@@ -4860,7 +5541,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                     </span>
                     <h1 className="text-xl font-serif font-bold text-gray-900 mt-1">
                       {pdfCurrentPage === 1 && "Course Syllabus & Concept Baseline"}
-                      {pdfCurrentPage === 2 && "Chapter 2: Vector Subspaces & The Rank-Nullity Theorem"}
+                      {pdfCurrentPage === 2 && "Chapter 2: Core Grounded Architecture & Principles"}
                       {pdfCurrentPage === 3 && "Chapter 4: Orthogonality, Gram-Schmidt & Projections"}
                       {pdfCurrentPage >= 4 && "Chapter 5: Eigenspaces, Characteristic Roots & Jordan Form"}
                     </h1>
@@ -5165,7 +5846,9 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                       <circle cx="12" cy="12" r="1.2" fill="#0DFA6C" />
                     </svg>
                   </div>
-                  <span className="font-serif italic text-lg text-white">GapFinder AI</span>
+                  <span className="font-serif italic text-lg text-white">
+                    GapFinder {isTeacher ? 'Faculty' : 'AI'}
+                  </span>
                 </div>
                 <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-gray-400 hover:text-white">
                   <X className="w-5 h-5" />
@@ -5179,12 +5862,9 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                     {group.items.map((item) => (
                       <button
                         key={item.id}
-                        onClick={() => {
-                          setActiveTab(item.id);
-                          setMobileMenuOpen(false);
-                        }}
+                        onClick={() => handleNavClick(item.id)}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold ${
-                          activeTab === item.id ? 'bg-[#003B1B] text-[#6BFF8F] font-semibold' : 'text-gray-400 hover:text-white hover:bg-[#161A1D]'
+                          isNavActive(item.id) ? 'bg-[#003B1B] text-[#6BFF8F] font-semibold' : 'text-gray-400 hover:text-white hover:bg-[#161A1D]'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
@@ -5200,7 +5880,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
             </div>
 
             <div className="pt-4 border-t border-[#22282C] flex items-center justify-between">
-              <span className="text-xs text-gray-300 truncate">{currentUser?.name || 'Alex Chen'}</span>
+              <span className="text-xs text-gray-300 truncate">{currentUser?.name || (isTeacher ? 'Faculty Administrator' : 'Alex Chen')}</span>
               <button onClick={onLogout} className="text-xs text-[#BA1A1A] font-bold hover:underline">Sign out</button>
             </div>
           </div>

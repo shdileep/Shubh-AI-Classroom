@@ -256,6 +256,30 @@ def init_db():
                 details TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS practice_question_papers (
+                id SERIAL PRIMARY KEY,
+                document_id INTEGER,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                topic VARCHAR(255) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                questions_json TEXT NOT NULL,
+                total_questions INTEGER DEFAULT 10,
+                total_marks INTEGER DEFAULT 100,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS practice_submissions (
+                id SERIAL PRIMARY KEY,
+                paper_id INTEGER REFERENCES practice_question_papers(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                topic VARCHAR(255) NOT NULL,
+                answers_json TEXT NOT NULL,
+                score INTEGER DEFAULT 0,
+                total_marks INTEGER DEFAULT 100,
+                percentage INTEGER DEFAULT 0,
+                evaluation_json TEXT,
+                weakest_points_json TEXT,
+                submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
     else:
         # SQLite Schema
@@ -460,6 +484,30 @@ def init_db():
                 title TEXT NOT NULL,
                 details TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS practice_question_papers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id INTEGER,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                topic TEXT NOT NULL,
+                title TEXT NOT NULL,
+                questions_json TEXT NOT NULL,
+                total_questions INTEGER DEFAULT 10,
+                total_marks INTEGER DEFAULT 100,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS practice_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                paper_id INTEGER REFERENCES practice_question_papers(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                topic TEXT NOT NULL,
+                answers_json TEXT NOT NULL,
+                score INTEGER DEFAULT 0,
+                total_marks INTEGER DEFAULT 100,
+                percentage INTEGER DEFAULT 0,
+                evaluation_json TEXT,
+                weakest_points_json TEXT,
+                submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS email_verifications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

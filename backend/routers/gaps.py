@@ -97,6 +97,20 @@ def get_knowledge_gap_report(current_user: Dict[str, Any] = Depends(get_current_
         medium_count = 0
         strong_count = 0
 
+        # Fetch user's topics metadata from DB if available
+        cur.execute("SELECT topic_name, unit_name, root_cause, grounding_citation, blocked_prerequisites, exam_weight FROM topics WHERE user_id = %s" if IS_POSTGRES else "SELECT topic_name, unit_name, root_cause, grounding_citation, blocked_prerequisites, exam_weight FROM topics WHERE user_id = ?", (user_id,))
+        t_meta_rows = cur.fetchall()
+        db_topics_meta = {}
+        for tm in t_meta_rows:
+            tn = tm[0] if IS_POSTGRES else tm["topic_name"]
+            db_topics_meta[tn] = {
+                "unit": tm[1] if IS_POSTGRES else tm["unit_name"],
+                "root_cause": tm[2] if IS_POSTGRES else tm["root_cause"],
+                "grounding": tm[3] if IS_POSTGRES else tm["grounding_citation"],
+                "blocked_prerequisites": [p.strip() for p in ((tm[4] if IS_POSTGRES else tm["blocked_prerequisites"]) or "").split(",") if p.strip()],
+                "exam_weight": tm[5] if IS_POSTGRES else tm["exam_weight"]
+            }
+
         for r in rows:
             topic = r[0] if IS_POSTGRES else r["topic"]
             score = r[1] if IS_POSTGRES else r["mastery_score"]
@@ -111,16 +125,17 @@ def get_knowledge_gap_report(current_user: Dict[str, Any] = Depends(get_current_
             else:
                 strong_count += 1
 
-            meta = TOPIC_DIAGNOSTIC_PROFILES.get(topic, {
-                "unit": "Curriculum Core",
-                "exam_weight": "15% of Exam",
-                "root_cause": f"Foundational understanding gaps exposed during diagnostic testing for {topic}.",
-                "blocked_prerequisites": [f"{topic} Advanced Topics"],
-                "grounding": "Course Materials & Past Exams",
-                "misconception": f"Misunderstood theoretical boundary conditions of {topic}.",
-                "recommended_action": f"Review textbook chapter and execute targeted micro-drills on {topic}.",
-                "evidence_level": "Moderate (2 questions evaluated)"
-            })
+            db_m = db_topics_meta.get(topic, {})
+            meta = {
+                "unit": db_m.get("unit") or TOPIC_DIAGNOSTIC_PROFILES.get(topic, {}).get("unit", "Curriculum Module"),
+                "exam_weight": db_m.get("exam_weight") or TOPIC_DIAGNOSTIC_PROFILES.get(topic, {}).get("exam_weight", "20% of Exam"),
+                "root_cause": db_m.get("root_cause") or TOPIC_DIAGNOSTIC_PROFILES.get(topic, {}).get("root_cause", f"Deficit in conceptual derivation and verification of {topic}."),
+                "blocked_prerequisites": db_m.get("blocked_prerequisites") or TOPIC_DIAGNOSTIC_PROFILES.get(topic, {}).get("blocked_prerequisites", [f"{topic} Applications"]),
+                "grounding": db_m.get("grounding") or TOPIC_DIAGNOSTIC_PROFILES.get(topic, {}).get("grounding", "Uploaded Course Materials"),
+                "misconception": TOPIC_DIAGNOSTIC_PROFILES.get(topic, {}).get("misconception", f"Misunderstands fundamental operational invariants of {topic}."),
+                "recommended_action": f"Review source notes and complete the 10-Question Grounded Paper for {topic}.",
+                "evidence_level": "Verified via Assessment & Grounded Questions"
+            }
 
             topic_diagnoses.append({
                 "topic": topic,

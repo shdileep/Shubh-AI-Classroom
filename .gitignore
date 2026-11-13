@@ -26,6 +26,8 @@ dist/
 */dist/
 build/
 */build/
+!gapfinder-app/dist/
+!gapfinder-app/dist/**
 
 # Python cache & virtual environments
 __pycache__/

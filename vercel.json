@@ -1,14 +1,20 @@
 {
   "version": 2,
+  "framework": "vite",
   "buildCommand": "cd gapfinder-app && npm install && npm run build",
   "outputDirectory": "gapfinder-app/dist",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "gapfinder-app/dist/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/index.py"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]

@@ -90,6 +90,8 @@ async def root_clerk_webhook(request: Request):
     return await auth.clerk_webhook(request)
 
 @app.get("/")
+@app.get("/index.html")
+@app.get("/api")
 def root():
     index_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gapfinder-app", "dist", "index.html")
     if os.path.exists(index_file):
@@ -112,6 +114,37 @@ def health_check():
         "version": "2.4.0",
         "database": "PostgreSQL (psycopg2)" if IS_POSTGRES else "SQLite Fallback (gapfinder.db)",
         "postgres_configured": IS_POSTGRES
+    }
+
+# Mount static assets if gapfinder-app/dist exists
+dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gapfinder-app", "dist")
+assets_dir = os.path.join(dist_dir, "assets")
+if os.path.exists(assets_dir):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+@app.get("/{full_path:path}")
+def catch_all(full_path: str):
+    if full_path.startswith("api/"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not Found")
+    
+    target_file = os.path.join(dist_dir, full_path)
+    if os.path.exists(target_file) and os.path.isfile(target_file):
+        from fastapi.responses import FileResponse
+        return FileResponse(target_file)
+
+    index_file = os.path.join(dist_dir, "index.html")
+    if os.path.exists(index_file):
+        from fastapi.responses import FileResponse
+        return FileResponse(index_file)
+
+    return {
+        "status": "online",
+        "service": "GapFinder AI EdTech Backend & API",
+        "version": "2.4.0",
+        "docs": "/docs",
+        "health": "/api/health"
     }
 
 if __name__ == "__main__":
