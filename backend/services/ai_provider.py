@@ -60,39 +60,75 @@ class AIProviderOrchestrator:
                 print(f"[AI Provider] Jev exception ({ep}): {e}")
         return None
 
-    def call_groq(self, prompt: str, system_prompt: str = "", model: str = "llama-3.1-8b-instant", json_mode: bool = False) -> Optional[str]:
-        if not GROQ_API_KEY:
+    def call_groq(self, prompt: str, system_prompt: str = "", model: str = "qwen/qwen3.8-27b", json_mode: bool = False) -> Optional[str]:
+        groq_key = os.getenv("GROQ_API_KEY") or GROQ_API_KEY
+        if not groq_key:
             return None
-        try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
+        candidate_models = [model, "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "allam-2-7b"]
+        candidate_models = list(dict.fromkeys(candidate_models))
+        for m in candidate_models:
+            try:
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {groq_key}",
+                    "Content-Type": "application/json"
+                }
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
 
-            payload = {
-                "model": model,
-                "messages": messages,
-                "temperature": 0.2,
-                "max_tokens": 2048,
-            }
-            if json_mode:
-                payload["response_format"] = {"type": "json_object"}
+                payload = {
+                    "model": m,
+                    "messages": messages,
+                    "temperature": 0.2,
+                    "max_tokens": 2048,
+                }
+                if json_mode:
+                    payload["response_format"] = {"type": "json_object"}
 
-            resp = requests.post(url, headers=headers, json=payload, timeout=3)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data["choices"][0]["message"]["content"]
-            else:
-                print(f"[AI Provider] Groq error {resp.status_code}: {resp.text}")
-                return None
-        except Exception as e:
-            print(f"[AI Provider] Groq exception: {e}")
+                resp = requests.post(url, headers=headers, json=payload, timeout=8)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    print(f"[AI Provider] Groq model {m} returned {resp.status_code}")
+            except Exception as e:
+                print(f"[AI Provider] Groq exception on {m}: {e}")
+        return None
+
+    def call_huggingface_gemma(self, prompt: str, system_prompt: str = "") -> Optional[str]:
+        """Call Hugging Face Gemma / Open models using user HF_TOKEN."""
+        hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY") or HF_TOKEN
+        if not hf_token:
             return None
+        gemma_models = [
+            "google/gemma-2-2b-it",
+            "google/gemma-2-9b-it",
+            "google/gemma-7b-it"
+        ]
+        headers = {
+            "Authorization": f"Bearer {hf_token}",
+            "Content-Type": "application/json"
+        }
+        for g_model in gemma_models:
+            try:
+                url = f"https://router.huggingface.co/hf-inference/models/{g_model}"
+                full_input = f"{system_prompt}\n\nUser: {prompt}\nAssistant:" if system_prompt else prompt
+                payload = {
+                    "inputs": full_input,
+                    "parameters": {"max_new_tokens": 512, "temperature": 0.2, "return_full_text": False}
+                }
+                resp = requests.post(url, headers=headers, json=payload, timeout=6)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        gen = data[0].get("generated_text", "")
+                        if gen:
+                            return gen.strip()
+            except Exception as e:
+                print(f"[AI Provider] HF Gemma exception ({g_model}): {e}")
+        return None
 
     def call_anthropic(self, prompt: str, system_prompt: str = "", model: str = "claude-3-5-sonnet-20241022") -> Optional[str]:
         if not ANTHROPIC_API_KEY:
@@ -206,37 +242,47 @@ class AIProviderOrchestrator:
 
     def generate_completion(self, prompt: str, system_prompt: str = "", task_type: str = "fast", json_mode: bool = False) -> Dict[str, Any]:
         """
-        Orchestrate LLM call based on task type and live availability:
-        For fast tasks (Shubh AI Tutor, instant response), prioritizes Groq llama-3.1-8b-instant for sub-second latency.
-        Falls back to Gemini, Claude, and OpenAI resiliently.
+        Orchestrate LLM call across Hugging Face Gemma, Groq, Gemini, and OpenAI.
         """
         start_time = time.time()
         result_text = None
         used_provider = "none"
 
-        # For fast tasks, Groq's llama-3.1-8b-instant yields the fastest sub-500ms time to first token
-        if task_type == "fast" and GROQ_API_KEY:
-            result_text = self.call_groq(prompt, system_prompt, model="llama-3.1-8b-instant", json_mode=json_mode)
+        # Check for user query mentioning gemma / huggingface
+        prompt_lower = prompt.lower()
+        if "gemma" in prompt_lower or "hugging" in prompt_lower or os.getenv("PREFER_GEMMA") == "1":
+            result_text = self.call_huggingface_gemma(prompt, system_prompt)
             if result_text:
-                used_provider = "groq-fast"
+                used_provider = "huggingface-gemma"
 
-        # Try Google Gemini (AI Studio) next if not yet resolved
+        # Primary high-speed provider: Groq
+        if not result_text and (os.getenv("GROQ_API_KEY") or GROQ_API_KEY):
+            result_text = self.call_groq(prompt, system_prompt, json_mode=json_mode)
+            if result_text:
+                used_provider = "groq-qwen"
+
+        # Fallback to Hugging Face Gemma if not tried yet
+        if not result_text and (os.getenv("HF_TOKEN") or HF_TOKEN):
+            result_text = self.call_huggingface_gemma(prompt, system_prompt)
+            if result_text:
+                used_provider = "huggingface-gemma"
+
+        # Fallback to Google Gemini
         if not result_text and (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
             result_text = self.call_gemini(prompt, system_prompt)
             if result_text:
                 used_provider = "gemini"
 
-        # Try slower providers only for non-fast reasoning tasks
-        if not result_text and task_type != "fast":
-            if ANTHROPIC_API_KEY:
-                result_text = self.call_anthropic(prompt, system_prompt)
-                if result_text:
-                    used_provider = "anthropic"
+        # Fallback to Anthropic Claude or OpenAI
+        if not result_text and ANTHROPIC_API_KEY:
+            result_text = self.call_anthropic(prompt, system_prompt)
+            if result_text:
+                used_provider = "anthropic"
 
-            if not result_text and OPENAI_API_KEY:
-                result_text = self.call_openai(prompt, system_prompt, json_mode=json_mode)
-                if result_text:
-                    used_provider = "openai"
+        if not result_text and OPENAI_API_KEY:
+            result_text = self.call_openai(prompt, system_prompt, json_mode=json_mode)
+            if result_text:
+                used_provider = "openai"
 
         elapsed = round(time.time() - start_time, 2)
         return {

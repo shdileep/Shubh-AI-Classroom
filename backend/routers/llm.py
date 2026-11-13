@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
-from backend.auth import get_current_user
+from backend.auth import get_current_user, get_current_user_flexible
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
 
@@ -137,11 +137,22 @@ def generate_drill(req: DrillRequest, current_user: Dict[str, Any] = Depends(get
     }
 
 @router.post("/chat")
-def assistant_chat(req: ChatRequest, current_user: Dict[str, Any] = Depends(get_current_user)):
+def assistant_chat(req: ChatRequest, current_user: Dict[str, Any] = Depends(get_current_user_flexible)):
     """Autonomous AI Agent execution endpoint for curriculum diagnostics and gap remediation."""
     user_id = current_user.get("sub", 1)
+    student_name = current_user.get("name", "Student")
     message = req.message.strip()
     msg_lower = message.lower()
+
+    if any(k in msg_lower for k in ["what is your name", "what is ur name", "what's your name", "who are you", "who made you", "ur name"]):
+        return {
+            "reply": (
+                f"Hello {student_name}! I am **Shubh AI Assistant**, your personal academic study and concept mastery assistant in GapFinder.\n\n"
+                f"I help you diagnose knowledge gaps from assessments, synthesize adaptive revision plans, explain difficult theorems, and visualize concept dependencies with flowcharts. How can I assist your study session right now?"
+            ),
+            "topic": req.topic or "Shubh AI Assistant",
+            "citations": []
+        }
 
     conn = get_connection()
     cur = conn.cursor()
