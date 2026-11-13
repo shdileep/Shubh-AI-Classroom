@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Flame, Award, Calendar, Clock, CheckCircle2, 
-  Shield, User, Zap
+  Shield, User, Zap, Lock
 } from 'lucide-react';
 
 export default function ProfileView({ currentUser, dashboardData, activityList = [] }) {
@@ -222,6 +222,185 @@ export default function ProfileView({ currentUser, dashboardData, activityList =
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ===================== ACADEMIC MILESTONE MEDALS & BADGES ===================== */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#E5E0D6] shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+              <Award className="w-5 h-5 text-amber-600" />
+              <span>Academic Milestone Medals & Badges</span>
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Verified tenure recognitions earned through continuous diagnostic coursework and gap remediation.
+            </p>
+          </div>
+          <span className="text-xs font-bold text-gray-700 bg-gray-50 px-3 py-1 rounded-lg border border-gray-200 shrink-0">
+            {currentStreak >= 180 ? '4/4 Medals Unlocked' :
+             currentStreak >= 90 ? '3/4 Medals Unlocked' :
+             currentStreak >= 30 ? '2/4 Medals Unlocked' :
+             currentStreak >= 7 ? '1/4 Medals Unlocked' : '0/4 Medals Unlocked'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 1. 1 Week = Learner */}
+          {(() => {
+            const unlocked = currentStreak >= 7 || totalActivities >= 7;
+            const progress = Math.min(Math.max(currentStreak, totalActivities), 7);
+            return (
+              <div className={`p-5 rounded-2xl border transition-all ${
+                unlocked 
+                  ? 'bg-gradient-to-b from-emerald-50/70 to-white border-emerald-300 shadow-xs' 
+                  : 'bg-gray-50/60 border-gray-200 opacity-75'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center p-1.5 shadow-xs ${
+                    unlocked 
+                      ? 'bg-white ring-2 ring-emerald-300 shadow-sm' 
+                      : 'bg-gray-100 opacity-50 grayscale'
+                  }`}>
+                    <img src="/badges/learner.png" alt="Learner Medal" className="w-full h-full object-contain" />
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    unlocked 
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                      : 'bg-gray-200 text-gray-500 flex items-center gap-1'
+                  }`}>
+                    {unlocked ? 'Unlocked' : <><Lock className="w-2.5 h-2.5" /> Locked</>}
+                  </span>
+                </div>
+                <h3 className="font-extrabold text-sm text-gray-900">Learner Medal</h3>
+                <p className="text-[11px] font-semibold text-emerald-800 mt-0.5">1 Week Milestone</p>
+                <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                  Active diagnostic engagement across your initial 7 days of verified coursework.
+                </p>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                  <span className="text-gray-500 font-medium">Tenure Progress</span>
+                  <span className="font-mono font-bold text-gray-900">{unlocked ? 'Complete' : `${progress}/7 Days`}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 2. 1 Month = Silver */}
+          {(() => {
+            const unlocked = currentStreak >= 30 || totalActivities >= 30;
+            const progress = Math.min(Math.max(currentStreak, totalActivities), 30);
+            return (
+              <div className={`p-5 rounded-2xl border transition-all ${
+                unlocked 
+                  ? 'bg-gradient-to-b from-slate-50 to-white border-slate-300 shadow-xs' 
+                  : 'bg-gray-50/60 border-gray-200 opacity-75'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center p-1.5 shadow-xs ${
+                    unlocked 
+                      ? 'bg-white ring-2 ring-slate-300 shadow-sm' 
+                      : 'bg-gray-100 opacity-50 grayscale'
+                  }`}>
+                    <img src="/badges/silver.png" alt="Silver Medal" className="w-full h-full object-contain" />
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    unlocked 
+                      ? 'bg-slate-200 text-slate-800 border border-slate-300' 
+                      : 'bg-gray-200 text-gray-500 flex items-center gap-1'
+                  }`}>
+                    {unlocked ? 'Unlocked' : <><Lock className="w-2.5 h-2.5" /> Locked</>}
+                  </span>
+                </div>
+                <h3 className="font-extrabold text-sm text-gray-900">Silver Medal</h3>
+                <p className="text-[11px] font-semibold text-slate-700 mt-0.5">1 Month Milestone</p>
+                <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                  Consistent syllabus drill execution and revision cadence for 30 active days.
+                </p>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                  <span className="text-gray-500 font-medium">Tenure Progress</span>
+                  <span className="font-mono font-bold text-gray-900">{unlocked ? 'Complete' : `${progress}/30 Days`}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 3. 3 Months = Gold */}
+          {(() => {
+            const unlocked = currentStreak >= 90 || totalActivities >= 90;
+            const progress = Math.min(Math.max(currentStreak, totalActivities), 90);
+            return (
+              <div className={`p-5 rounded-2xl border transition-all ${
+                unlocked 
+                  ? 'bg-gradient-to-b from-amber-50/70 to-white border-amber-300 shadow-xs' 
+                  : 'bg-gray-50/60 border-gray-200 opacity-75'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center p-1.5 shadow-xs ${
+                    unlocked 
+                      ? 'bg-white ring-2 ring-amber-300 shadow-sm' 
+                      : 'bg-gray-100 opacity-50 grayscale'
+                  }`}>
+                    <img src="/badges/gold.png" alt="Gold Medal" className="w-full h-full object-contain" />
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    unlocked 
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                      : 'bg-gray-200 text-gray-500 flex items-center gap-1'
+                  }`}>
+                    {unlocked ? 'Unlocked' : <><Lock className="w-2.5 h-2.5" /> Locked</>}
+                  </span>
+                </div>
+                <h3 className="font-extrabold text-sm text-gray-900">Gold Medal</h3>
+                <p className="text-[11px] font-semibold text-amber-700 mt-0.5">3 Months Milestone</p>
+                <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                  Rigorous academic discipline across 90 days with measurable topic mastery.
+                </p>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                  <span className="text-gray-500 font-medium">Tenure Progress</span>
+                  <span className="font-mono font-bold text-gray-900">{unlocked ? 'Complete' : `${progress}/90 Days`}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 4. 6 Months = Platinum */}
+          {(() => {
+            const unlocked = currentStreak >= 180 || totalActivities >= 180;
+            const progress = Math.min(Math.max(currentStreak, totalActivities), 180);
+            return (
+              <div className={`p-5 rounded-2xl border transition-all ${
+                unlocked 
+                  ? 'bg-gradient-to-b from-cyan-50/70 to-white border-cyan-300 shadow-xs' 
+                  : 'bg-gray-50/60 border-gray-200 opacity-75'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center p-1.5 shadow-xs ${
+                    unlocked 
+                      ? 'bg-white ring-2 ring-cyan-300 shadow-sm' 
+                      : 'bg-gray-100 opacity-50 grayscale'
+                  }`}>
+                    <img src="/badges/platinum.png" alt="Platinum Medal" className="w-full h-full object-contain" />
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    unlocked 
+                      ? 'bg-cyan-100 text-cyan-900 border border-cyan-300' 
+                      : 'bg-gray-200 text-gray-500 flex items-center gap-1'
+                  }`}>
+                    {unlocked ? 'Unlocked' : <><Lock className="w-2.5 h-2.5" /> Locked</>}
+                  </span>
+                </div>
+                <h3 className="font-extrabold text-sm text-gray-900">Platinum Medal</h3>
+                <p className="text-[11px] font-semibold text-cyan-800 mt-0.5">6 Months Milestone</p>
+                <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                  Prestige institutional excellence and continuous mastery over 180 active days.
+                </p>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                  <span className="text-gray-500 font-medium">Tenure Progress</span>
+                  <span className="font-mono font-bold text-gray-900">{unlocked ? 'Complete' : `${progress}/180 Days`}</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

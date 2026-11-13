@@ -1890,15 +1890,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                   <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                            Student Directory
-                          </span>
-                          <h3 className="font-bold text-base text-gray-900">Enrolled Student Cohort Registry</h3>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Click the Eye Icon to view student material upload summary, topics studying, and submission dates.
-                        </p>
+                        <h3 className="font-bold text-base text-gray-900">Enrolled Student Cohort Registry</h3>
                       </div>
                       <span className="text-xs font-bold text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 shrink-0">
                         {teacherStudentsList.length || 9} Students Listed
@@ -1981,15 +1973,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                   <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-100 pb-3">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase bg-red-100 text-red-900 px-2.5 py-0.5 rounded-full border border-red-200">
-                            Immediate Remediation Required
-                          </span>
-                          <h3 className="text-base font-bold text-gray-900">Weaker Students & Specific Gap Topics (&lt;50%)</h3>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Surfaced separately so faculty can assign focused drills or dedicate lecture time to the exact bottleneck concepts.
-                        </p>
+                        <h3 className="text-base font-bold text-gray-900">Weaker Students & Specific Gap Topics (&lt;50%)</h3>
                       </div>
                       <span className="text-xs font-bold text-red-700 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 shrink-0">
                         {weakerStudentsList.length} At-Risk Incident(s)
@@ -2049,15 +2033,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                 <div className="space-y-6 animate-fadeIn">
                   <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                          Live Student Registry
-                        </span>
-                        <h1 className="text-xl font-black text-gray-900">Student Cohort Directory & Uploaded Materials Audit</h1>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Click the Eye Icon on any student to inspect their uploaded materials, topics studying, page counts, and upload dates.
-                      </p>
+                      <h1 className="text-xl font-black text-gray-900">Student Cohort Directory</h1>
                     </div>
                     <span className="text-xs font-semibold text-gray-700 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shrink-0">
                       {teacherStudentsList.length || 9} Students Listed
@@ -2149,15 +2125,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                   <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-100 pb-3">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase bg-red-100 text-red-900 px-2.5 py-0.5 rounded-full border border-red-200">
-                            Immediate Remediation Required
-                          </span>
-                          <h2 className="text-base font-bold text-gray-900">Weaker Students & Specific Gap Topics (&lt;50%)</h2>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Surfaced separately so faculty can assign focused drills or dedicate lecture time to the exact bottleneck concepts.
-                        </p>
+                        <h2 className="text-base font-bold text-gray-900">Weaker Students & Specific Gap Topics (&lt;50%)</h2>
                       </div>
                       <span className="text-xs font-bold text-red-700 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 shrink-0">
                         {weakerStudentsList.length} At-Risk Incident(s)
@@ -2217,14 +2185,8 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8 space-y-6 max-w-4xl mx-auto">
                   <div className="border-b border-gray-100 pb-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                        AI-Grounded Assignment Creator
-                      </span>
-                      <h2 className="text-xl font-black text-gray-900">Create Academic Assignment Grounded in Course Material</h2>
+                      <h2 className="text-xl font-black text-gray-900">Create Assignment</h2>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Upload any syllabus chapter, lecture notes, or past question paper. Our model extracts concepts and prepares a 30-MCQ Quiz or 10-Question Paper grounded strictly in the source text.
-                    </p>
                   </div>
 
                   <form onSubmit={handleCreateAssignment} className="space-y-5 text-left text-xs">
@@ -3106,9 +3068,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               
               <div className="border-b border-[#E4DFD5] pb-5">
                 <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Study Materials & Course Library</h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Upload syllabus outlines, textbook chapters, and past papers. Ground your practice and revision in verified coursework.
-                </p>
               </div>
 
               {/* Unified Intuitive Drag & Drop Ingestion Card */}
@@ -3271,9 +3230,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E4DFD5] pb-5">
                 <div>
                   <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Curriculum & Topic Map</h1>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Structured hierarchy: Subject → Unit → Chapter → Topic → Concept. Enriched with concept mastery scores and exam weights.
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -3408,48 +3364,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               </div>
               )}
 
-              {/* Retrieval-Grounded Past Exam Question Mappings (Satisfies Hackathon PS Condition 1) */}
-              <div className="bg-white rounded-2xl border border-[#E4DFD5] p-6 shadow-xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-amber-200">
-                        Retrieval Grounded
-                      </span>
-                      <h2 className="text-base font-bold text-gray-900">Past Exam Questions Mapped to Syllabus</h2>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Semantic BM25 retrieval connects questions from past question papers directly to specific syllabus units and concepts.
-                    </p>
-                  </div>
-                  <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 shrink-0">
-                    {examMappingsData?.total_mapped_questions || 6} Questions Mapped · {examMappingsData?.syllabus_coverage_pct || 86}% Exam Coverage
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(examMappingsData?.mappings || []).map((em, idx) => (
-                    <div key={idx} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 hover:bg-white hover:border-emerald-300 transition-all space-y-2.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-emerald-950 font-mono bg-emerald-100/60 px-2 py-0.5 rounded">
-                          {em.question_number} · {em.paper_title}
-                        </span>
-                        <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                          Match: {Math.round(em.similarity_score * 100)}%
-                        </span>
-                      </div>
-                      <p className="text-gray-800 font-medium line-clamp-2 leading-relaxed italic">
-                        "{em.question_text}"
-                      </p>
-                      <div className="flex flex-wrap items-center justify-between pt-2 border-t border-gray-200 text-[11px] gap-2">
-                        <span className="text-gray-600 font-semibold">Mapped: <strong className="text-black">{em.mapped_topic}</strong></span>
-                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">{em.frequency_rating}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             </div>
           )}
 
@@ -3461,11 +3375,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               {!activeAssessment && (
                 <div className="bg-white rounded-2xl border border-[#E4DFD5] p-8 shadow-sm space-y-6">
                   <div className="border-b border-gray-100 pb-5">
-                    <span className="text-xs font-bold text-[#006E2F] uppercase tracking-widest">Adaptive Assessment</span>
-                    <h1 className="text-2xl font-extrabold text-gray-900 mt-1">Start Adaptive Concept Assessment</h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Evaluates foundational concepts against your uploaded course materials. Answer keys and rubrics are evaluated strictly on the backend.
-                    </p>
+                    <h1 className="text-2xl font-extrabold text-gray-900">Start Adaptive Concept Assessment</h1>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3765,14 +3675,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E4DFD5] pb-5">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-[#006E2F] uppercase tracking-widest">Core Product Feature</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Evidence Grounded</span>
-                  </div>
-                  <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight mt-0.5">Knowledge Gap Report</h1>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Discover what you don't know, why you don't know it, and the exact course sections to remediate.
-                  </p>
+                  <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Knowledge Gap Report</h1>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -3989,9 +3892,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E4DFD5] pb-5">
                 <div>
                   <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Adaptive Revision Planner</h1>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Structured day-by-day tasks prioritizing foundational prerequisites and weak topics. Adapts when new assessment evidence arrives.
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -4459,11 +4359,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               {/* Header with Top Submit Button */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E4DFD5] pb-5">
                 <div>
-                  <span className="text-xs font-bold text-[#006E2F] uppercase tracking-widest">Formal Assessment Grounding</span>
-                  <h1 className="text-2xl font-extrabold text-gray-900 mt-1">Grounded Academic Practice Examination</h1>
-                  <p className="text-sm text-gray-500 mt-1">
-                    10 comprehensive questions grounded strictly in your uploaded course material (10 marks each = 100 marks total).
-                  </p>
+                  <h1 className="text-2xl font-extrabold text-gray-900">Practice Examination</h1>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -4855,9 +4751,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               
               <div className="border-b border-[#E4DFD5] pb-5">
                 <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Progress Analytics & Telemetry</h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Track knowledge score improvements, study activity telemetry, and curriculum mastery distributions.
-                </p>
               </div>
 
               {/* 3 Metric Mini Cards */}
@@ -4935,10 +4828,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               
               <div className="border-b border-[#E4DFD5] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Verified Learning History</h1>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Chronological record of completed quizzes, revision tasks, and uploaded course materials.
-                  </p>
+                  <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Learning History</h1>
                 </div>
 
                 {/* Filter Tabs */}
@@ -5216,7 +5106,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
             <div className="max-w-4xl mx-auto space-y-6">
               <div className="border-b border-[#E4DFD5] pb-5">
                 <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Saved Bookmarks</h1>
-                <p className="text-sm text-gray-500 mt-1">Saved formulas, core theorems, and textbook citations.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -5263,7 +5152,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
               <div className="flex items-center justify-between border-b border-[#E4DFD5] pb-5">
                 <div>
                   <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Student Conceptual Notes</h1>
-                  <p className="text-sm text-gray-500 mt-1">Personal synthesis and notes linked directly to course topics.</p>
                 </div>
                 <button
                   onClick={() => setNewNoteModal(true)}
@@ -5357,7 +5245,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
             <div className="max-w-4xl mx-auto space-y-6">
               <div className="border-b border-[#E4DFD5] pb-5">
                 <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Learning Preferences & System Settings</h1>
-                <p className="text-sm text-gray-500 mt-1">Configure target exam dates, study pacing, and diagnostic learning preferences.</p>
               </div>
 
               {/* AI Engine Status Card */}
