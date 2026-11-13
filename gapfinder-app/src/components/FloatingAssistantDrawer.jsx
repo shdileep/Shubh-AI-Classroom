@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Sparkles, X, Maximize2, Minimize2, Minus, ArrowUpRight, Send, 
-  Paperclip, FileText, RefreshCw, Zap, Calendar, GitBranch, Search
+  Paperclip, FileText, RefreshCw
 } from 'lucide-react';
 import FlowchartViewer from './FlowchartViewer';
 
@@ -59,9 +59,8 @@ export default function FloatingAssistantDrawer({
     }
   };
 
-  const handleSend = (textToSend) => {
-    const text = textToSend || inputText;
-    const trimmed = text.trim();
+  const handleSend = () => {
+    const trimmed = inputText.trim();
     if (!trimmed && !attachedFile) return;
 
     onSendMessage(trimmed || `Please analyze this attached document: ${attachedFile?.name}`, {
@@ -74,11 +73,6 @@ export default function FloatingAssistantDrawer({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Agent Quick Action Dispatcher
-  const triggerAgentAction = (actionPrompt) => {
-    handleSend(actionPrompt);
-  };
-
   return (
     <>
       {/* 1. Floating Action Bubble (Bottom Right) */}
@@ -88,16 +82,13 @@ export default function FloatingAssistantDrawer({
             setIsMaximized(false);
             onToggle();
           }}
-          aria-label="Open Shubh AI Agent"
+          aria-label="Open Shubh AI Assistant"
           className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-[#003B1B] via-[#0A0D0E] to-[#003B1B] hover:from-[#003B1B] hover:to-[#14532D] text-white rounded-full shadow-[0_10px_25px_-5px_rgba(0,59,27,0.4)] border border-emerald-500/40 transition-all duration-300 hover:scale-105 group cursor-pointer"
         >
           <div className="w-6 h-6 rounded-full bg-emerald-400/20 text-emerald-300 flex items-center justify-center">
             <Sparkles className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
           </div>
-          <span className="text-xs font-bold tracking-wide">Shubh AI</span>
-          <span className="text-[10px] font-bold uppercase bg-emerald-400/20 text-[#6BFF8F] px-1.5 py-0.2 rounded border border-emerald-400/30">
-            Agent
-          </span>
+          <span className="text-xs font-bold tracking-wide">Shubh AI Assistant</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#6BFF8F]"></span>
         </button>
       )}
@@ -113,14 +104,14 @@ export default function FloatingAssistantDrawer({
         >
           {/* Header */}
           <div className="px-4 py-3 bg-[#FAF8F5] border-b border-[#E5E0D6] flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-[#0A0D0E] text-emerald-300 flex items-center justify-center shadow-xs">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
               </div>
-              <h3 className="text-xs font-black text-gray-900 tracking-tight">Shubh AI</h3>
-              <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-                Agent
-              </span>
+              <div>
+                <h3 className="text-xs font-black text-gray-900 tracking-tight leading-tight">Shubh AI Assistant</h3>
+                <p className="text-[10px] text-gray-500 font-medium leading-none mt-0.5">Study & Concept Assistant</p>
+              </div>
             </div>
 
             {/* Header Controls: Maximize/Restore, Minimize, Close */}
@@ -170,65 +161,14 @@ export default function FloatingAssistantDrawer({
             </div>
           </div>
 
-          {/* Action & Message Body */}
+          {/* Message Body */}
           <div className="flex-1 p-3.5 overflow-y-auto space-y-3 custom-scrollbar bg-[#FAF9F7]">
-            {/* If no chat history, display direct actionable agent tools (no chatbot/FAQ text) */}
-            {assistantMessages.length === 0 && (
-              <div className="space-y-2.5 pt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
-                  Autonomous Agent Actions
-                </div>
-
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    onClick={() => triggerAgentAction("Analyze my active curriculum and identify critical knowledge gaps with root causes.")}
-                    className="p-2.5 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-xl text-left transition-all shadow-xs group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-3.5 h-3.5 text-amber-500" />
-                      <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Run Gap Diagnostics</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => triggerAgentAction("Synthesize an adaptive 5-day revision plan prioritizing my weakest prerequisite topics.")}
-                    className="p-2.5 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-xl text-left transition-all shadow-xs group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Compile Remedial Revision Plan</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => triggerAgentAction("Generate a visual concept flowchart linking foundational prerequisites to advanced topics using Mermaid syntax.")}
-                    className="p-2.5 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-xl text-left transition-all shadow-xs group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <GitBranch className="w-3.5 h-3.5 text-indigo-500" />
-                      <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Build Concept Dependency Flowchart</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => triggerAgentAction("Verify textbook and syllabus grounding citations for my current course materials.")}
-                    className="p-2.5 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-xl text-left transition-all shadow-xs group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Search className="w-3.5 h-3.5 text-cyan-600" />
-                      <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Audit Course Citations</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Message Stream */}
             {assistantMessages.map((msg, idx) => (
               <div key={idx} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'assistant' && (
                   <div className="w-6 h-6 rounded-lg bg-[#0A0D0E] text-emerald-300 flex items-center justify-center shrink-0 text-[10px] shadow-2xs mt-0.5">
-                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                   </div>
                 )}
                 
@@ -250,7 +190,7 @@ export default function FloatingAssistantDrawer({
             {assistantLoading && (
               <div className="flex items-center gap-2 text-xs text-gray-500 italic p-2.5 bg-white rounded-xl border border-gray-200 w-fit">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-700" />
-                <span>Executing agent task...</span>
+                <span>Processing...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -265,7 +205,7 @@ export default function FloatingAssistantDrawer({
               </div>
               <button 
                 onClick={() => setAttachedFile(null)}
-                className="text-emerald-700 hover:text-emerald-950 p-0.5"
+                className="text-emerald-700 hover:text-emerald-950 p-0.5 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -285,7 +225,7 @@ export default function FloatingAssistantDrawer({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                title="Attach document or syllabus"
+                title="Attach document or notes"
                 className="p-2 text-gray-500 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-colors border border-gray-200 bg-white cursor-pointer"
               >
                 <Paperclip className="w-3.5 h-3.5" />
@@ -293,7 +233,7 @@ export default function FloatingAssistantDrawer({
 
               <input
                 type="text"
-                placeholder="Give command to agent..."
+                placeholder="Ask Shubh AI Assistant..."
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}

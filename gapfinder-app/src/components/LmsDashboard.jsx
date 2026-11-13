@@ -4944,65 +4944,20 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                   <div className="w-9 h-9 rounded-xl bg-[#0A0D0E] text-emerald-300 flex items-center justify-center shadow-xs">
                     <Sparkles className="w-4 h-4 text-emerald-400" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold text-gray-900">Shubh AI</h2>
-                    <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-                      Agent
-                    </span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#0A0D0E] text-emerald-300 flex items-center justify-center shadow-xs">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold text-gray-900 leading-tight">Shubh AI Assistant</h2>
+                      <p className="text-[11px] text-gray-500 font-medium leading-none mt-0.5">Study & Concept Assistant</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Chat Message Scroll Area */}
               <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar bg-[#FAF9F7]">
-                {assistantMessages.length === 0 && (
-                  <div className="max-w-xl mx-auto py-8 space-y-4">
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">
-                      Autonomous Agent Direct Actions
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <button
-                        onClick={() => handleSendMessage("Analyze my active curriculum and identify critical knowledge gaps with root causes.")}
-                        className="p-4 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-2xl text-left transition-all shadow-xs group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Zap className="w-4 h-4 text-amber-500" />
-                          <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Run Gap Diagnostics</span>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => handleSendMessage("Synthesize an adaptive 5-day revision plan prioritizing my weakest prerequisite topics.")}
-                        className="p-4 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-2xl text-left transition-all shadow-xs group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Calendar className="w-4 h-4 text-emerald-600" />
-                          <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Compile Remedial Revision Plan</span>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => handleSendMessage("Generate a visual concept flowchart linking foundational prerequisites to advanced topics using Mermaid syntax.")}
-                        className="p-4 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-2xl text-left transition-all shadow-xs group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Layers className="w-4 h-4 text-indigo-500" />
-                          <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Build Concept Dependency Flowchart</span>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => handleSendMessage("Verify textbook and syllabus grounding citations for my current course materials.")}
-                        className="p-4 bg-white hover:bg-emerald-50/50 border border-gray-200 hover:border-emerald-300 rounded-2xl text-left transition-all shadow-xs group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Search className="w-4 h-4 text-cyan-600" />
-                          <span className="text-xs font-bold text-gray-900 group-hover:text-emerald-900">Audit Course Citations</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
                 {assistantMessages.map((msg, idx) => (
                   <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {msg.role === 'assistant' && (
