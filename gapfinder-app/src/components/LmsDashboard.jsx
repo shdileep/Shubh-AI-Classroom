@@ -4985,14 +4985,9 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                   <div className="w-9 h-9 rounded-xl bg-[#0A0D0E] text-emerald-300 flex items-center justify-center shadow-xs">
                     <Sparkles className="w-4 h-4 text-emerald-400" />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-[#0A0D0E] text-emerald-300 flex items-center justify-center shadow-xs">
-                      <Sparkles className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-bold text-gray-900 leading-tight">Shubh AI Assistant</h2>
-                      <p className="text-[11px] text-gray-500 font-medium leading-none mt-0.5">Study & Concept Assistant</p>
-                    </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-900 leading-tight">Shubh AI Assistant</h2>
+                    <p className="text-[11px] text-gray-500 font-medium leading-none mt-0.5">Study & Concept Assistant</p>
                   </div>
                 </div>
               </div>
