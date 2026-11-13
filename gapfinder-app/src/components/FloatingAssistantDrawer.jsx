@@ -14,7 +14,8 @@ export default function FloatingAssistantDrawer({
   assistantMessages = [],
   assistantLoading,
   onSendMessage,
-  currentUser
+  currentUser,
+  isTakingAssessment = false
 }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -29,8 +30,8 @@ export default function FloatingAssistantDrawer({
     }
   }, [assistantMessages, isOpen, isMaximized]);
 
-  // When activeTab is 'assistant', the floating assistant is hidden to avoid duplicate view
-  if (activeTab === 'assistant') {
+  // When taking exam/quiz or when activeTab is 'assistant', the floating assistant is completely hidden
+  if (activeTab === 'assistant' || isTakingAssessment) {
     return null;
   }
 
@@ -88,7 +89,7 @@ export default function FloatingAssistantDrawer({
           <div className="w-6 h-6 rounded-full bg-emerald-400/20 text-emerald-300 flex items-center justify-center">
             <Sparkles className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
           </div>
-          <span className="text-xs font-bold tracking-wide">Shubh AI Assistant</span>
+          <span className="text-xs font-bold tracking-wide">Shubh AI</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#6BFF8F]"></span>
         </button>
       )}

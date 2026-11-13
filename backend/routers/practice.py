@@ -256,10 +256,13 @@ def submit_practice_paper(req: SubmitPaperRequest, current_user: Dict[str, Any] 
         questions = json.loads(p_row[0] if IS_POSTGRES else p_row["questions_json"])
         total_questions = len(questions) or 10
 
-        # Perform rigorous and harsh evaluation
+        # Perform rigorous, harsh, semantic evaluation
         evaluation_results = []
         total_score = 0
         weakest_points = []
+        attempted_count = 0
+
+        stop_words = {"what", "which", "where", "when", "that", "this", "from", "with", "have", "been", "will", "your", "must", "show", "give", "each", "both", "such", "than", "then", "into", "only", "also", "describe", "explain", "analyze", "derive", "state", "define", "given"}
 
         for idx, q in enumerate(questions):
             qid = str(q.get("id", idx + 1))
@@ -267,38 +270,55 @@ def submit_practice_paper(req: SubmitPaperRequest, current_user: Dict[str, Any] 
             q_text = q.get("question_text", "")
             student_ans = req.answers.get(qid, req.answers.get(str(idx + 1), "")).strip()
 
-            word_count = len(student_ans.split())
             key_points = q.get("key_points", ["Conceptual definition", "Formal theorem", "Worked validation"])
+            model_ans = q.get("model_answer", q_text)
+            
+            # Extract expected technical keywords from question, key points, and background model answer
+            ref_text = f"{q_text} {' '.join(key_points)} {model_ans}".lower()
+            ref_keywords = {w for w in re.findall(r'\b[a-zA-Z]{4,}\b', ref_text) if w not in stop_words}
 
-            # Harsh evaluation rubric
-            if not student_ans or word_count < 5:
+            if not student_ans or len(student_ans.split()) < 3:
                 awarded_marks = 0
-                verdict = "Unanswered / Insufficient Response"
-                critique = "No substantial technical explanation provided. 0/10 marks awarded."
+                verdict = "Not Attempted / Blank"
+                critique = "Candidate did not attempt this question. 0/10 marks awarded."
                 missing = key_points
-                weakest_points.append(f"{q_num}: {q_text[:70]}... (0/10 - Blank or insufficient)")
-            elif word_count < 20:
-                awarded_marks = 3
-                verdict = "Superficial Outline"
-                critique = f"Answer mentions basic terminology but lacks mathematical rigor, formal definitions, and governing mechanisms. Deducted 7 marks."
-                missing = key_points[1:]
-                weakest_points.append(f"{q_num}: {q_text[:70]}... (3/10 - Lacks technical derivation)")
-            elif word_count < 45:
-                awarded_marks = 6
-                verdict = "Partial Competency"
-                critique = f"Solid initial understanding, but omitted key edge cases and formal validation criteria cited in course material. Deducted 4 marks."
-                missing = [key_points[-1]]
-                weakest_points.append(f"{q_num}: {q_text[:70]}... (6/10 - Incomplete proof/validation)")
-            elif word_count < 80:
-                awarded_marks = 8
-                verdict = "Proficient Demonstration"
-                critique = "Thorough answer covering core concepts, governing formulation, and logical steps. Minor omission of secondary caveats."
-                missing = []
+                weakest_points.append(f"{q_num}: {q_text[:70]}... (0/10 - Not attempted)")
             else:
-                awarded_marks = 9
-                verdict = "Exemplary Rigor"
-                critique = "Exceptional, comprehensive response with formal definitions, step-by-step derivations, and complete conceptual validation."
-                missing = []
+                attempted_count += 1
+                ans_tokens = set(re.findall(r'\b[a-zA-Z]{4,}\b', student_ans.lower()))
+                matched_keywords = ans_tokens.intersection(ref_keywords)
+                keyword_ratio = len(matched_keywords) / max(len(ref_keywords), 1)
+                ans_len = len(student_ans.split())
+
+                # Harsh evaluation rubric: Check relevance against background rubric
+                if keyword_ratio < 0.12 or len(matched_keywords) < 2:
+                    awarded_marks = 0
+                    verdict = "Irrelevant / Conceptually Incorrect"
+                    critique = f"Answer does not address the required technical concepts or mathematical formulation of {q_num}. Response failed to match background reference standards. 0/10 marks awarded."
+                    missing = key_points
+                    weakest_points.append(f"{q_num}: {q_text[:70]}... (0/10 - Irrelevant or incorrect)")
+                elif keyword_ratio < 0.25:
+                    awarded_marks = 2
+                    verdict = "Marginal Attempt (Superficial Terms Only)"
+                    critique = f"Mentioned basic terminology ({', '.join(list(matched_keywords)[:3])}), but lacked foundational derivation, mathematical constraints, and precision. Deducted 8 marks."
+                    missing = key_points[1:]
+                    weakest_points.append(f"{q_num}: {q_text[:70]}... (2/10 - Lacks technical derivation)")
+                elif keyword_ratio < 0.40 or ans_len < 25:
+                    awarded_marks = 5
+                    verdict = "Partial Competency"
+                    critique = f"Basic understanding demonstrated ({', '.join(list(matched_keywords)[:4])}), but omitted formal proofs, edge cases, and governing properties. Deducted 5 marks."
+                    missing = [key_points[-1]] if key_points else []
+                    weakest_points.append(f"{q_num}: {q_text[:70]}... (5/10 - Incomplete proof/validation)")
+                elif keyword_ratio < 0.60 or ans_len < 55:
+                    awarded_marks = 7
+                    verdict = "Proficient Demonstration"
+                    critique = "Thorough response with correct principles, formulation, and structured steps. Minor omissions in secondary caveats. Deducted 3 marks."
+                    missing = []
+                else:
+                    awarded_marks = 9
+                    verdict = "Exemplary Rigor"
+                    critique = "Exceptional, comprehensive response matching reference standards with clear derivation, correct terminology, and complete conceptual validation."
+                    missing = []
 
             total_score += awarded_marks
             evaluation_results.append({
@@ -311,7 +331,7 @@ def submit_practice_paper(req: SubmitPaperRequest, current_user: Dict[str, Any] 
                 "verdict": verdict,
                 "critique": critique,
                 "missing_concepts": missing,
-                "model_answer": q.get("model_answer", "Refer to syllabus definitions.")
+                "model_answer": model_ans
             })
 
         percentage = round((total_score / (total_questions * 10)) * 100)

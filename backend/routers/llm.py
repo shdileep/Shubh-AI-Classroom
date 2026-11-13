@@ -144,12 +144,27 @@ def assistant_chat(req: ChatRequest, current_user: Dict[str, Any] = Depends(get_
     message = req.message.strip()
     msg_lower = message.lower()
 
-    if any(k in msg_lower for k in ["what is your name", "what is ur name", "what's your name", "who are you", "who made you", "ur name"]):
+    if any(k in msg_lower for k in ["what is your name", "what is ur name", "what's your name", "who are you", "who are u", "who r u", "who r you", "who made you", "ur name", "your name"]):
         return {
             "reply": (
-                f"Hello {student_name}! I am **Shubh AI Assistant**, your personal academic study and concept mastery assistant in GapFinder.\n\n"
+                f"Hello {student_name}! I am **Shubh AI Assistant**, your personal academic study and concept assistant in GapFinder.\n\n"
                 f"I help you diagnose knowledge gaps from assessments, synthesize adaptive revision plans, explain difficult theorems, and visualize concept dependencies with flowcharts. How can I assist your study session right now?"
             ),
+            "topic": req.topic or "Shubh AI Assistant",
+            "citations": []
+        }
+
+    if any(k in msg_lower for k in ["my name", "what is my name", "what's my name", "who am i", "who am i?"]):
+        user_course = current_user.get("course", "Foundational STEM & Computing")
+        return {
+            "reply": f"Your name is **{student_name}**, enrolled in **{user_course}** in GapFinder. What topic would you like to review today?",
+            "topic": req.topic or "Shubh AI Assistant",
+            "citations": []
+        }
+
+    if msg_lower in ["hi", "hello", "hey", "good morning", "good evening", "greetings"]:
+        return {
+            "reply": f"Hello {student_name}! I am Shubh AI Assistant, ready to assist your study session. Would you like to check your knowledge gaps, generate an adaptive revision plan, or ask a question about your course materials?",
             "topic": req.topic or "Shubh AI Assistant",
             "citations": []
         }

@@ -32,10 +32,10 @@ def chat_with_assistant(req: AssistantChatRequest, current_user: Dict[str, Any] 
     topic = req.topic or "Foundational Concepts"
 
     # 1. Direct identity query handler
-    if any(k in lowered_query for k in ["what is your name", "what is ur name", "what's your name", "who are you", "who made you", "ur name"]):
+    if any(k in lowered_query for k in ["what is your name", "what is ur name", "what's your name", "who are you", "who are u", "who r u", "who r you", "who made you", "ur name", "your name"]):
         return {
             "reply": (
-                f"Hello {student_name}! I am **Shubh AI Assistant**, your personal academic study and concept mastery assistant in GapFinder.\n\n"
+                f"Hello {student_name}! I am **Shubh AI Assistant**, your personal academic study and concept assistant in GapFinder.\n\n"
                 f"I help you:\n"
                 f"- **Diagnose Knowledge Gaps:** Pinpoint foundational prerequisites you missed in assessments.\n"
                 f"- **Synthesize Adaptive Revision Plans:** Build 5-day prioritized study roadmaps tailored to your course.\n"
@@ -49,6 +49,33 @@ def chat_with_assistant(req: AssistantChatRequest, current_user: Dict[str, Any] 
                 "student_name": student_name,
                 "topic": topic,
                 "decision": "Assisted with identity inquiry"
+            }
+        }
+
+    # 1b. User name / student profile query handler
+    if any(k in lowered_query for k in ["my name", "what is my name", "what's my name", "who am i", "who am i?"]):
+        user_course = current_user.get("course", "Foundational STEM & Computing")
+        return {
+            "reply": f"Your name is **{student_name}**, and you are currently enrolled in **{user_course}** in GapFinder. What topic would you like to review today?",
+            "citations": [],
+            "decision_info": {
+                "agent_name": "Shubh AI Assistant",
+                "student_name": student_name,
+                "topic": topic,
+                "decision": "Assisted with student name inquiry"
+            }
+        }
+
+    # 1c. Simple greetings
+    if lowered_query in ["hi", "hello", "hey", "good morning", "good evening", "greetings"]:
+        return {
+            "reply": f"Hello {student_name}! I am Shubh AI Assistant, ready to assist your study session. Would you like to check your knowledge gaps, generate an adaptive revision plan, or ask a question about your course materials?",
+            "citations": [],
+            "decision_info": {
+                "agent_name": "Shubh AI Assistant",
+                "student_name": student_name,
+                "topic": topic,
+                "decision": "Assisted with greeting"
             }
         }
 
@@ -178,12 +205,17 @@ def chat_with_assistant(req: AssistantChatRequest, current_user: Dict[str, Any] 
                 f"```\n\n"
                 f"This decision tree ensures you verify whether a matrix possesses zero eigenvalues before calculating eigenspaces."
             )
+        elif context_str and retrieved_chunks:
+            primary_chunk = retrieved_chunks[0]
+            reply_content = (
+                f"Hello {student_name}! Based on your uploaded course material (*{primary_chunk['document_title']}*):\n\n"
+                f"{primary_chunk['source_text'][:380]}...\n\n"
+                f"This relates directly to **{topic}**. Would you like me to synthesize a practice question on this concept?"
+            )
         else:
             reply_content = (
-                f"Hello {student_name}. Regarding **{topic}**:\n\n"
-                f"The core principle lies in relating the algebraic multiplicity of eigenvalues to their geometric eigenspace dimension (nullity). "
-                f"Under the Rank-Nullity Theorem, dim(V) = rank(T) + nullity(T). "
-                f"A zero root indicates non-trivial nullity (dim >= 1), implying non-invertibility and det(A) = 0."
+                f"Hello {student_name}! Regarding **{topic}**:\n\n"
+                f"I am here to guide your study sessions and help you master course concepts. What specific problem, derivation, or formula would you like to review together?"
             )
 
     citations = []

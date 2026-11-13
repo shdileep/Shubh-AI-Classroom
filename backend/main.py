@@ -92,6 +92,7 @@ async def root_clerk_webhook(request: Request):
 @app.get("/")
 @app.get("/index.html")
 @app.get("/api")
+@app.get("/api/")
 def root():
     index_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gapfinder-app", "dist", "index.html")
     if os.path.exists(index_file):

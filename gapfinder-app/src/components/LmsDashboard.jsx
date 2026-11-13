@@ -181,6 +181,13 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
     notifications_enabled: true
   });
 
+  // Strict Full-Screen Assessment Mode: hides sidebar, top navigation, and floating assistant
+  const isTakingAssessment = Boolean(
+    (activeTab === 'practice' && practicePaperData && !practicePaperData.has_submitted) ||
+    (studentAssignmentModalOpen && !studentAssignmentResult) ||
+    (activeTab === 'diagnostics' && activeAssessment && !assessmentResults)
+  );
+
   // View Role strictly determined by authenticated user role (no student-to-teacher switching)
   const [viewRole, setViewRole] = useState(() => (isTeacher ? 'teacher' : 'student'));
 
@@ -903,6 +910,24 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
     await loadPracticePaper(topicName);
   };
 
+  // Grounded Practice: Page Sliding Navigation (<< 1 >>) with Auto-Save
+  const handleSlideQuestionPage = (targetIdx) => {
+    if (!practicePaperData?.questions) return;
+    const currentQ = practicePaperData.questions[practiceActiveQuestionIndex];
+    const qNum = currentQ?.number || currentQ?.id || (practiceActiveQuestionIndex + 1);
+    const ansText = (practiceAnswers[qNum] || '').trim();
+
+    // Auto-save the current answer if non-empty
+    if (ansText && !practiceSavedQuestions.includes(qNum)) {
+      setPracticeSavedQuestions(prev => [...prev, qNum]);
+      showToast(`Question ${qNum} answer auto-saved.`);
+    }
+
+    if (targetIdx >= 0 && targetIdx < practicePaperData.questions.length) {
+      setPracticeActiveQuestionIndex(targetIdx);
+    }
+  };
+
   // Grounded Practice: Save & Next
   const handleSaveAndNextPracticeQuestion = () => {
     if (!practicePaperData?.questions) return;
@@ -1058,12 +1083,16 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         // Intelligent client-side assistant fallback (never output robotic template)
         const msgLow = displayMsg.toLowerCase();
         let fallbackText = '';
-        if (msgLow.includes('what is your name') || msgLow.includes('what is ur name') || msgLow.includes("what's your name") || msgLow.includes('who are you') || msgLow.includes('ur name')) {
-          fallbackText = `Hello! I am **Shubh AI Assistant**, your academic study and concept mastery assistant in GapFinder.\n\nI specialize in analyzing assessment telemetry to find your weakest prerequisite topics, building adaptive 5-day study plans, and providing step-by-step concept explanations. How can I assist you right now?`;
+        if (msgLow.includes('what is your name') || msgLow.includes('what is ur name') || msgLow.includes("what's your name") || msgLow.includes('who are you') || msgLow.includes('who are u') || msgLow.includes('who r u') || msgLow.includes('who r you') || msgLow.includes('ur name') || msgLow.includes('your name')) {
+          fallbackText = `Hello! I am **Shubh AI Assistant**, your personal academic study and concept assistant in GapFinder.\n\nI specialize in analyzing assessment telemetry to find your weakest prerequisite topics, building adaptive 5-day study plans, and providing step-by-step concept explanations. How can I assist you right now?`;
+        } else if (msgLow.includes('my name') || msgLow.includes('who am i') || msgLow.includes("what's my name") || msgLow.includes('what is my name')) {
+          fallbackText = `Your name is **${currentUser?.name || 'Alex Chen'}**, and you are enrolled in **${currentUser?.course || 'Foundational STEM & Computing'}** in GapFinder. What topic would you like to review today?`;
+        } else if (msgLow === 'hi' || msgLow === 'hello' || msgLow === 'hey' || msgLow.startsWith('hi ') || msgLow.startsWith('hello ')) {
+          fallbackText = `Hello ${currentUser?.name || 'there'}! I am Shubh AI Assistant, ready to assist your study session. Would you like to check your knowledge gaps, generate an adaptive revision plan, or explore a course concept?`;
         } else if (msgLow.includes('revision') || msgLow.includes('plan') || msgLow.includes('5-day') || msgLow.includes('5 day') || msgLow.includes('schedule')) {
           fallbackText = `### 📅 Adaptive 5-Day Revision Plan\n**Priority Focus:** Remediating Critical Prerequisite Bottlenecks in **Quadratic Roots & Nullity** (32% Mastery) & **Orthogonal Projections** (48% Mastery).\n\n#### 🗓️ Day 1: Foundational Prerequisites & Null Space\n- **Topic:** Linear Maps & Kernel Definitions (45m study + 15m drill)\n- **Objective:** Understand how algebraic roots link to geometric nullity.\n\n#### 🗓️ Day 2: The Rank-Nullity Theorem\n- **Topic:** dim(V) = rank(T) + nullity(T) (50m theory + 20m exercises)\n- **Objective:** Separate algebraic multiplicity from eigenspace dimension.\n\n#### 🗓️ Day 3: Inner Products & Orthogonal Complements\n- **Topic:** Subspace Orthogonality & Projections (60m review + 20m problems)\n- **Objective:** Master vector projection matrix formulas.\n\n#### 🗓️ Day 4: Gram-Schmidt Orthogonalization\n- **Topic:** Orthonormal Bases & Approximations (60m problems + 15m review)\n- **Objective:** Eliminate sign errors during Gram-Schmidt normalization.\n\n#### 🗓️ Day 5: Synthesis & Mock Assessment\n- **Topic:** Comprehensive Assessment & Mastery Audit (45m test + 30m gap review)\n- **Objective:** Elevate verified score from 32% to ≥85%.\n\n\`\`\`mermaid\ngraph TD\n    D1[Day 1: Kernel & Nullity Basics] --> D2[Day 2: Rank-Nullity Theorem]\n    D2 --> D3[Day 3: Orthogonal Complements]\n    D3 --> D4[Day 4: Gram-Schmidt Projections]\n    D4 --> D5[Day 5: Mock Assessment & Mastery Audit]\n\`\`\``;
         } else {
-          fallbackText = `Hello! As **Shubh AI Assistant**, I am here to help you master **${assistantTopic || 'Quadratic Roots & Nullity'}**.\n\nIn your recent assessments, the primary gap was confusing algebraic multiplicity of roots with the geometric kernel dimension (nullity). According to the Rank-Nullity Theorem, \\(\\dim(V) = \\text{rank}(T) + \\text{nullity}(T)\\). A root at zero guarantees \\(\\det(A) = 0\\) and non-trivial nullity. Would you like a targeted 3-minute practice drill or a flowchart?`;
+          fallbackText = `Hello! As **Shubh AI Assistant**, I am here to guide your study sessions and help you master your coursework. What specific concept, theorem, or question would you like to explore together?`;
         }
         setAssistantMessages([
           ...newMsgs,
@@ -1077,10 +1106,12 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
     } catch (err) {
       const msgLow = displayMsg.toLowerCase();
       let fallbackText = '';
-      if (msgLow.includes('what is your name') || msgLow.includes('what is ur name') || msgLow.includes('who are you')) {
-        fallbackText = `Hello! I am **Shubh AI Assistant**, your personal academic study and concept mastery companion.`;
+      if (msgLow.includes('what is your name') || msgLow.includes('what is ur name') || msgLow.includes('who are you') || msgLow.includes('who are u') || msgLow.includes('who r u')) {
+        fallbackText = `Hello! I am **Shubh AI Assistant**, your personal academic study and concept mastery assistant.`;
+      } else if (msgLow.includes('my name') || msgLow.includes('who am i')) {
+        fallbackText = `Your name is **${currentUser?.name || 'Alex Chen'}**, enrolled in **Foundational STEM & Computing**.`;
       } else {
-        fallbackText = `Hello! Regarding **${assistantTopic || 'Course Concepts'}**: I recommend reviewing the Rank-Nullity Theorem and completing a practice drill to strengthen your mastery.`;
+        fallbackText = `Hello! I am Shubh AI Assistant. What concept or problem from your course materials would you like to work through?`;
       }
       setAssistantMessages([
         ...newMsgs,
@@ -1472,7 +1503,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
       {/* ===================== FIXED COLLAPSIBLE SIDEBAR ===================== */}
       <aside className={`h-full bg-[#0A0D0E] text-white flex flex-col justify-between transition-all duration-300 z-30 shrink-0 border-r border-[#22282C] ${
         sidebarCollapsed ? 'w-20' : 'w-72'
-      } hidden md:flex`}>
+      } ${isTakingAssessment ? 'hidden' : 'hidden md:flex'}`}>
         
         {/* Top Brand Logo matching Landing Page */}
         <div>
@@ -1595,7 +1626,9 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         
         {/* ===================== TOP NAVIGATION BAR ===================== */}
-        <header className="h-16 bg-white border-b border-[#E4DFD5] flex items-center justify-between px-6 shrink-0 z-20">
+        <header className={`h-16 bg-white border-b border-[#E4DFD5] flex items-center justify-between px-6 shrink-0 z-20 ${
+          isTakingAssessment ? 'hidden' : ''
+        }`}>
           
           {/* Left: Mobile hamburger & Breadcrumbs */}
           <div className="flex items-center gap-4">
@@ -4448,7 +4481,47 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
 
                   {/* Grounded Examination Paper & Answer Sheet */}
                   {practicePaperData && !practicePaperLoading && (
-                    <div className="space-y-6 animate-fadeIn">
+                    <div className={!practicePaperData.has_submitted ? "fixed inset-0 z-50 bg-[#FAF8F5] w-screen h-screen overflow-y-auto p-4 sm:p-8 flex flex-col justify-between" : "space-y-6 animate-fadeIn"}>
+                      
+                      {/* Fullscreen Assessment Top Bar */}
+                      {!practicePaperData.has_submitted && (
+                        <div className="flex items-center justify-between pb-4 border-b border-gray-200 shrink-0 mb-4">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest bg-emerald-100 text-emerald-950 px-3 py-1 rounded-full border border-emerald-300">
+                              Examination Mode
+                            </span>
+                            <h2 className="text-sm font-extrabold text-gray-900 truncate max-w-md">
+                              {practicePaperData.title || `Academic Examination: ${practicePaperData.topic}`}
+                            </h2>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm("Exit examination? Your written answers will remain saved in this session.")) {
+                                  setPracticePaperData(null);
+                                  setActiveTab("overview");
+                                }
+                              }}
+                              className="px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:text-black bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Exit Exam</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleSubmitPracticePaper}
+                              disabled={practicePaperSubmitting}
+                              className="px-4 py-2 bg-[#003B1B] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>{practicePaperSubmitting ? "Evaluating..." : "Submit Test (100 Marks)"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Post-Submission Weakest Points & Evaluation Banner */}
                       {practicePaperData.has_submitted && practicePaperData.submission && (
@@ -4587,12 +4660,6 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                                   <p className="text-xs text-gray-800 font-medium leading-relaxed">
                                     {q.question_text || q.question}
                                   </p>
-
-                                  {(q.key_concepts || (q.key_points && q.key_points.join(' · ')) || q.citation) && (
-                                    <span className="inline-block text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                                      Key: {q.key_concepts || (q.key_points && q.key_points[0]) || q.citation}
-                                    </span>
-                                  )}
                                 </div>
                               );
                             })}
@@ -4647,16 +4714,34 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
 
                             return (
                               <div className="flex-1 flex flex-col justify-between space-y-4">
-                                <div className="space-y-2 border-t border-gray-100 pt-3">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                                      Candidate Answer Sheet · Question {currentQNum} of 10
+                                {/* Top Bar on Answer Sheet: Question Number & Top Submit Option */}
+                                <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                                      {currentQNum}
                                     </span>
-                                    <span className="text-xs font-mono font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">
-                                      Carries: 10 Marks
+                                    <span className="text-xs font-extrabold text-gray-900 uppercase tracking-wider">
+                                      Question {currentQNum} of 10
+                                    </span>
+                                    <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                      [10 Marks]
                                     </span>
                                   </div>
 
+                                  {!practicePaperData.has_submitted && (
+                                    <button
+                                      type="button"
+                                      onClick={handleSubmitPracticePaper}
+                                      disabled={practicePaperSubmitting}
+                                      className="px-3.5 py-1.5 bg-[#003B1B] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                      <span>Submit Paper</span>
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="space-y-1">
                                   <h3 className="text-sm font-bold text-gray-900 leading-snug">
                                     {currentQ.question_text || currentQ.question}
                                   </h3>
@@ -4704,47 +4789,48 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
                                   </div>
                                 )}
 
-                                {/* Bottom Buttons: Prev, Next, Save & Next, and Submit */}
-                                <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2">
+                                {/* Middle Pagination: << 1 >> Page Sliding Navigation with Auto-Save */}
+                                <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-gray-400">
+                                    Auto-saves on page turn
+                                  </span>
+
+                                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 shadow-xs">
                                     <button
                                       type="button"
                                       disabled={practiceActiveQuestionIndex === 0}
-                                      onClick={() => setPracticeActiveQuestionIndex(prev => Math.max(0, prev - 1))}
-                                      className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 text-gray-800 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                                      onClick={() => handleSlideQuestionPage(practiceActiveQuestionIndex - 1)}
+                                      className="px-2.5 py-1 text-xs font-black text-gray-800 hover:text-black hover:bg-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                      title="Previous Question Page (Auto-Saves)"
                                     >
-                                      <ArrowLeft className="w-3.5 h-3.5" /> Previous
+                                      &lt;&lt;
                                     </button>
+
+                                    <div className="px-3 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-extrabold text-gray-900 font-mono shadow-xs">
+                                      {practiceActiveQuestionIndex + 1}
+                                    </div>
+
                                     <button
                                       type="button"
                                       disabled={practiceActiveQuestionIndex === (practicePaperData.questions?.length - 1)}
-                                      onClick={() => setPracticeActiveQuestionIndex(prev => Math.min(practicePaperData.questions.length - 1, prev + 1))}
-                                      className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 text-gray-800 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                                      onClick={() => handleSlideQuestionPage(practiceActiveQuestionIndex + 1)}
+                                      className="px-2.5 py-1 text-xs font-black text-gray-800 hover:text-black hover:bg-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                      title="Next Question Page (Auto-Saves)"
                                     >
-                                      Next <ArrowRight className="w-3.5 h-3.5" />
+                                      &gt;&gt;
                                     </button>
                                   </div>
 
                                   {!practicePaperData.has_submitted ? (
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={handleSaveAndNextPracticeQuestion}
-                                        className="px-5 py-2.5 bg-[#003B1B] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                                      >
-                                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                        <span>Save & Next</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={handleSubmitPracticePaper}
-                                        disabled={practicePaperSubmitting}
-                                        className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
-                                      >
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-                                        <span>Submit Test</span>
-                                      </button>
-                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleSubmitPracticePaper}
+                                      disabled={practicePaperSubmitting}
+                                      className="px-4 py-2 bg-[#003B1B] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                      <span>{practicePaperSubmitting ? 'Evaluating...' : 'Submit Paper'}</span>
+                                    </button>
                                   ) : (
                                     <span className="text-xs font-bold text-gray-500 italic">
                                       🔒 Submission locked. View feedback above.
@@ -5375,6 +5461,7 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         assistantLoading={assistantLoading}
         onSendMessage={(msg, extra) => handleSendMessage(msg, extra)}
         currentUser={currentUser}
+        isTakingAssessment={isTakingAssessment}
       />
 
       {/* ===================== IN-PLACE "SHOW THAT PDF" DOCUMENT VIEWER MODAL ===================== */}
@@ -5551,10 +5638,10 @@ export default function LmsDashboard({ onLogout, onBackToLanding, currentUser, a
         </div>
       )}
 
-      {/* ===================== STUDENT ASSIGNMENT ATTEMPT RUNNER MODAL ===================== */}
+      {/* ===================== STUDENT ASSIGNMENT ATTEMPT RUNNER (FULL SCREEN SECTION) ===================== */}
       {studentAssignmentModalOpen && activeStudentAssignment && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-4xl w-full h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-[#FAF8F5] w-screen h-screen flex flex-col overflow-hidden animate-fadeIn">
+          <div className="bg-white border-b border-gray-200 w-full h-full flex flex-col overflow-hidden">
             {/* Modal Top Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-[#FAF8F5] shrink-0">
               <div>

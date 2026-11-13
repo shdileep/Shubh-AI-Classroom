@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import base64
 import requests
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv

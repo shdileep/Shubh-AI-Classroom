@@ -1,4 +1,5 @@
 import json
+import re
 import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -276,30 +277,63 @@ def submit_student_assignment(
                     "citation": q.get("citation")
                 })
         else:
-            # Question Paper (10 questions, 10 marks each = 100 marks)
+            # Question Paper (10 questions, 10 marks each = 100 marks total)
             total_marks = (len(questions) * 10) or 100
-            for q in questions:
-                qid = str(q.get("id"))
+            stop_words = {"what", "which", "where", "when", "that", "this", "from", "with", "have", "been", "will", "your", "must", "show", "give", "each", "both", "such", "than", "then", "into", "only", "also", "describe", "explain", "analyze", "derive", "state", "define", "given"}
+
+            for idx, q in enumerate(questions):
+                qid = str(q.get("id", idx + 1))
+                q_text = q.get("question_text") or q.get("question") or f"Question {idx + 1}"
                 ans_text = str(req.answers.get(qid, "")).strip()
-                # Score based on response quality and length
+                key_pts = q.get("key_points") or ["Mathematical Proof", "Formal Theorem", "Domain Constraints"]
+                model_ans = q.get("model_answer") or q_text
+
+                # Build reference keyword dictionary
+                ref_text = f"{q_text} {' '.join(key_pts)} {model_ans}".lower()
+                ref_keywords = {w for w in re.findall(r'\b[a-zA-Z]{4,}\b', ref_text) if w not in stop_words}
+
                 q_score = 0
-                if len(ans_text) >= 150:
-                    q_score = 9
-                elif len(ans_text) >= 80:
-                    q_score = 7
-                elif len(ans_text) >= 20:
-                    q_score = 5
-                elif len(ans_text) > 0:
-                    q_score = 3
+                verdict = "Not Attempted"
+                critique = "No answer provided. 0/10 marks awarded."
+
+                if ans_text and len(ans_text.split()) >= 3:
+                    ans_tokens = set(re.findall(r'\b[a-zA-Z]{4,}\b', ans_text.lower()))
+                    matched = ans_tokens.intersection(ref_keywords)
+                    ratio = len(matched) / max(len(ref_keywords), 1)
+                    ans_words = len(ans_text.split())
+
+                    if ratio < 0.12 or len(matched) < 2:
+                        q_score = 0
+                        verdict = "Irrelevant / Incorrect"
+                        critique = f"Response does not address required conceptual mechanisms. Failed background reference criteria. 0/10 marks awarded."
+                    elif ratio < 0.25:
+                        q_score = 2
+                        verdict = "Superficial Outline"
+                        critique = f"Mentioned basic terminology ({', '.join(list(matched)[:3])}) but omitted technical derivations and proofs. Deducted 8 marks."
+                    elif ratio < 0.40 or ans_words < 25:
+                        q_score = 5
+                        verdict = "Partial Competency"
+                        critique = f"Demonstrated partial understanding ({', '.join(list(matched)[:4])}) but omitted edge-case constraints. Deducted 5 marks."
+                    elif ratio < 0.60 or ans_words < 55:
+                        q_score = 7
+                        verdict = "Proficient Demonstration"
+                        critique = "Accurate response with sound technical reasoning and core formulations represented. Deducted 3 marks."
+                    else:
+                        q_score = 9
+                        verdict = "Exemplary Rigor"
+                        critique = "Comprehensive, accurate response matching course reference standards with clear derivation and correct terminology."
+
                 score += q_score
                 review_details.append({
                     "id": q.get("id"),
-                    "question": q.get("question_text"),
+                    "question": q_text,
                     "student_answer": ans_text,
                     "marks_awarded": q_score,
                     "marks_possible": 10,
-                    "model_answer": q.get("model_answer"),
-                    "key_points": q.get("key_points")
+                    "verdict": verdict,
+                    "critique": critique,
+                    "model_answer": model_ans,
+                    "key_points": key_pts
                 })
 
         percentage = round((score / total_marks) * 100) if total_marks else 0
