@@ -321,5 +321,3 @@ Pre-configured accounts for immediate evaluation:
 - **Confidentiality**: Course documents and generated study notes remain local to the student's authenticated session.
 
 ---
-
-*Built with ❤️ for Acadza AI by the Shubh AI Engineering Team.*
